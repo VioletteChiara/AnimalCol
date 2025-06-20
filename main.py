@@ -12,12 +12,19 @@ import pickle
 import Loading
 import display_colors
 import imghdr
-
+import Auto_detection
 
 class Interface(Frame):
     def __init__(self, fenetre, **kwargs):
         Frame.__init__(self, fenetre, width=0, height=0, bd=5, **kwargs)
         self.grid()
+        self.root=fenetre
+        self.root.rowconfigure(0,weight=1)
+        self.root.rowconfigure(1, weight=100)
+        self.root.columnconfigure(0, weight=1000)
+        self.root.columnconfigure(1, weight=1)
+
+        self.root.bind('<Control-s>', self.save)
 
         #image de saturation:
         self.saturations=display_colors.create_all_sat()
@@ -40,11 +47,13 @@ class Interface(Frame):
         #No images yet
         self.Images_names = []
 
+        self.project_open=False
+
 
         # Canvas:
         # Barre de titre
-        self.canvas_title_bar = Canvas(fenetre, height=20, bd=2, highlightthickness=1, relief='ridge')
-        self.canvas_title_bar.grid(row=0, column=0, columnspan=3, sticky=(N, S, E, W))
+        self.canvas_title_bar = Canvas(fenetre, height=20, relief='flat')
+        self.canvas_title_bar.grid(row=0, column=0, columnspan=1, sticky=(N, S, E, W))
         self.canvas_title_bar.columnconfigure(0, weight=1)
         self.canvas_title_bar.columnconfigure(1, weight=1)
         self.canvas_title_bar.columnconfigure(2, weight=100)
@@ -55,10 +64,13 @@ class Interface(Frame):
 
         # Visualisation de la video et barre de temps
         self.canvas_main = Canvas(fenetre, height=20, bd=2, highlightthickness=1, relief='ridge')
-        self.canvas_main.grid(row=1, column=0, sticky="ns")
+        self.canvas_main.grid(row=1, column=0, sticky="nsew")
+
+        self.canvas_main.columnconfigure(0, weight=1)
+        self.canvas_main.rowconfigure(0, weight=1)
 
         self.canvas_main_img = Canvas(self.canvas_main, height=20, bd=2, highlightthickness=1, relief='ridge')
-        self.canvas_main_img.grid(row=0, column=0, sticky="ns")
+        self.canvas_main_img.grid(row=0, column=0, sticky="nsew")
 
         self.canvas_main_but = Canvas(self.canvas_main, height=20, bd=2, highlightthickness=1, relief='ridge')
         self.canvas_main_but.grid(row=1, column=0, sticky="ns")
@@ -72,28 +84,82 @@ class Interface(Frame):
 
         # Right pannel
         self.canvas_user = Canvas(fenetre, height=100, width=100, bd=2, highlightthickness=1, relief='flat')
-        self.canvas_user.grid(row=1, column=1, sticky="ns")
+        self.canvas_user.grid(row=1, column=1, sticky="nse")
         self.canvas_user.rowconfigure(0, weight=1)
         self.canvas_user.rowconfigure(1, weight=1)
         self.canvas_user.rowconfigure(2, weight=1)
         self.canvas_user.rowconfigure(3, weight=1)
         self.canvas_user.rowconfigure(4, weight=1)
 
+
         # Widgets:
-        # Barre de titre
-        self.Nom_Logiciel = Label(self.canvas_title_bar, fg="white", text="ColCal", bg="purple",
-                                  font=("courier new", 12))
-        self.Nom_Logiciel.grid(row=0, column=0, sticky="w")
+        # Barre de suivi de curseur
+        self.position_mouse_x = StringVar()
+        self.position_mouse_x.set("X=0")
+        self.position_mouse_x_lab = Label(self.canvas_title_bar, textvariable=self.position_mouse_x, anchor="w")
+        self.position_mouse_x_lab.grid(row=0, column=0, sticky="w")
 
-        self.position_mouse = StringVar()
-        self.position_mouse.set("x=0, y=0")
-        self.position_mouse_lab = Label(self.canvas_title_bar, textvariable=self.position_mouse)
-        self.position_mouse_lab.grid(row=0, column=1, sticky="we")
+        self.position_mouse_y = StringVar()
+        self.position_mouse_y.set("Y=0")
+        self.position_mouse_y_lab = Label(self.canvas_title_bar, textvariable=self.position_mouse_y, anchor="w")
+        self.position_mouse_y_lab.grid(row=0, column=1, sticky="we")
 
-        self.bouton_New = Button(self.canvas_title_bar, text="Add Images", command=self.open_new_seq)
-        self.bouton_New.grid(row=0, column=2, sticky="e")
+        self.position_mouse_h = StringVar()
+        self.position_mouse_h.set("Hue=0")
+        self.position_mouse_h_lab = Label(self.canvas_title_bar, textvariable=self.position_mouse_h, anchor="w")
+        self.position_mouse_h_lab.grid(row=0, column=2, sticky="we")
 
-        self.bouton_Open = Button(self.canvas_title_bar, text="Open file", command=self.open_file)
+        self.position_mouse_s = StringVar()
+        self.position_mouse_s.set("Sat=0")
+        self.position_mouse_s_lab = Label(self.canvas_title_bar, textvariable=self.position_mouse_s, anchor="w")
+        self.position_mouse_s_lab.grid(row=0, column=3, sticky="we")
+
+        self.position_mouse_v = StringVar()
+        self.position_mouse_v.set("Val=0")
+        self.position_mouse_v_lab = Label(self.canvas_title_bar, textvariable=self.position_mouse_v)
+        self.position_mouse_v_lab.grid(row=0, column=4, sticky="we")
+
+        Grid.columnconfigure(self.canvas_title_bar, 0, weight=1, minsize=75)
+        Grid.columnconfigure(self.canvas_title_bar, 1, weight=1, minsize=75)
+        Grid.columnconfigure(self.canvas_title_bar, 2, weight=1, minsize=75)
+        Grid.columnconfigure(self.canvas_title_bar, 3, weight=1, minsize=75)
+        Grid.columnconfigure(self.canvas_title_bar, 4, weight=1, minsize=75)
+        Grid.columnconfigure(self.canvas_title_bar, 5, weight=100)
+
+
+        self.menubar = Menu(self.root)
+        self.projectmenu = Menu(self.menubar, tearoff=0)
+        self.menubar.add_cascade(label="Project", menu=self.projectmenu)
+        self.projectmenu.add_command(label="New", command=self.create_project)
+        self.projectmenu.add_command(label="Open", command=self.open_file)
+        self.projectmenu.add_command(label="Save", command=self.save)
+        self.projectmenu.add_command(label="Save as...", command=self.save_as)
+        self.projectmenu.add_command(label="Close", command=self.close)
+
+        self.projectmenu.entryconfig(2, state="disabled")
+        self.projectmenu.entryconfig(3, state="disabled")
+        self.projectmenu.entryconfig(4, state="disabled")
+
+        self.imagesmenu = Menu(self.menubar, tearoff=0)
+        self.menubar.add_cascade(label="Images", menu=self.imagesmenu)
+        self.imagesmenu.add_command(label="Add new images", command=self.add_images)
+        self.menubar.entryconfig("Images", state="disabled")
+
+        self.particlesmenu = Menu(self.menubar, tearoff=0)
+        self.menubar.add_cascade(label="Particles detection", menu=self.particlesmenu)
+        #self.particlesmenu.add_command(label="Automatic target detection", command=self.automated_findings)
+        self.particlesmenu.add_command(label="Export particles", command=self.save_particles)
+        self.menubar.entryconfig("Particles detection", state="disabled")
+
+        self.root.config(menu=self.menubar)
+
+
+        '''
+        self.bouton_New_images = Button(self.canvas_title_bar, text="Add images", command=self.open_new_seq)
+        self.bouton_New_images.grid(row=0, column=2, sticky="e")
+        self.bouton_New_images.config(state="disabled")
+
+        self.bouton_Open = Button(self.canvas_title_bar, text="Open project", command=self.open_file)
         self.bouton_Open.grid(row=0, column=3, sticky="e")
 
         self.bouton_Save = Button(self.canvas_title_bar, text="Save", command=self.save)
@@ -101,9 +167,8 @@ class Interface(Frame):
 
         self.bouton_Save_Particles = Button(self.canvas_title_bar, text="Export particles", command=self.save_particles)
         self.bouton_Save_Particles.grid(row=0, column=5, sticky="e")
-
-        self.bouton_Fermer = Button(self.canvas_title_bar, text="X", fg="white", bg="red", command=self.fermer)
-        self.bouton_Fermer.grid(row=0, column=6, sticky="e")
+        self.bouton_Save_Particles.config(state="disabled")
+        '''
 
         # Visualisation de la video
         self.canvas_main_img.bind("<Button-1>", self.callback_mask)
@@ -123,9 +188,10 @@ class Interface(Frame):
         Frame_ratio=Frame(self.canvas_user)
         Frame_ratio.grid(row=0, column=0, columnspan=3)
 
-        Label(Frame_ratio, text="Ratio").grid(row=0, column=0)
+        Label(Frame_ratio, text="Real life distance").grid(row=0, column=0)
         self.distance=StringVar()
-        Entry(Frame_ratio, textvariable=self.distance).grid(row=0, column=1)
+        self.Entry_dist=Entry(Frame_ratio, textvariable=self.distance)
+        self.Entry_dist.grid(row=0, column=1)
 
 
         Frame_show_col=Frame(self.canvas_user)
@@ -154,13 +220,13 @@ class Interface(Frame):
 
         Label(Color_selection, text="Saturation", font=("Helvetica", 12)).grid(row=1, column=1)
         self.canvas_img_sat=Canvas(Color_selection, width=20, height=100, bd=0, highlightthickness=0, relief='flat')
-        self.canvas_img_sat.grid(row=2, column=1, sticky="sn")
+        self.canvas_img_sat.grid(row=2, column=1, sticky="sn", pady=15)
         self.canvas_img_sat.bind("<Button-1>",self.move_sat)
         self.canvas_img_sat.bind("<B1-Motion>", self.drag_sat)
 
         Label(Color_selection, text="Value", font=("Helvetica", 12)).grid(row=1, column=2)
         self.canvas_img_val=Canvas(Color_selection, width=20, height=100, bd=0, highlightthickness=0, relief='flat')
-        self.canvas_img_val.grid(row=2, column=2, sticky="sn")
+        self.canvas_img_val.grid(row=2, column=2, sticky="sn", pady=15)
         self.canvas_img_val.bind("<Button-1>",self.move_val)
         self.canvas_img_val.bind("<B1-Motion>", self.drag_val)
 
@@ -194,29 +260,14 @@ class Interface(Frame):
         self.val_top.grid(row=2, column=2)
         self.val_top.bind("<Return>", self.update_show)
 
-
-        self.bouton_Valider = Button(self.canvas_choice_couleurs, text="Valider", fg="white", bg="green",
-                                     command=self.validate)
+        self.bouton_Valider = Button(self.canvas_choice_couleurs, text="Validate", fg="white", bg="green", command=self.validate)
         self.bouton_Valider.grid(row=2, column=3, sticky="e")
 
-        self.bouton_Valider_all = Button(self.canvas_choice_couleurs, text="Valider tout", fg="white", bg="red",
+        self.bouton_Valider_all = Button(self.canvas_choice_couleurs, text="Validate all", fg="white", bg="red",
                                          command=self.validate_all)
         self.bouton_Valider_all.grid(row=2, column=4, sticky="e")
 
-        self.hue_bot.delete(0, END)
-        self.hue_bot.insert(0, "0")
-        self.hue_top.delete(0, END)
-        self.hue_top.insert(0, "360")
-
-        self.sat_bot.delete(0, END)
-        self.sat_bot.insert(0, "0")
-        self.sat_top.delete(0, END)
-        self.sat_top.insert(0, "255")
-
-        self.val_bot.delete(0, END)
-        self.val_bot.insert(0, "0")
-        self.val_top.delete(0, END)
-        self.val_top.insert(0, "255")
+        self.empty_proj()
 
         self.Can_Tool_param = Canvas(self.canvas_user, height=20, bd=2, highlightthickness=1, relief='flat')
         self.Can_Tool_param.grid(row=3, column=0, sticky="ns")
@@ -305,7 +356,40 @@ class Interface(Frame):
         self.shown_col=[int(self.hue_bot.get()),0]
         self.shown_sat = [int(self.sat_bot.get()), 0]
         self.shown_val = [int(self.val_bot.get()), 0]
+        self.update()
         self.update_show()
+
+
+    def empty_proj(self):
+        self.hue_bot.delete(0, END)
+        self.hue_bot.insert(0, "0")
+        self.hue_top.delete(0, END)
+        self.hue_top.insert(0, "360")
+
+        self.sat_bot.delete(0, END)
+        self.sat_bot.insert(0, "0")
+        self.sat_top.delete(0, END)
+        self.sat_top.insert(0, "255")
+
+        self.val_bot.delete(0, END)
+        self.val_bot.insert(0, "0")
+        self.val_top.delete(0, END)
+        self.val_top.insert(0, "255")
+
+        self.Entry_dist.delete(0, END)
+        self.Entry_dist.insert(0, "1")
+
+
+    def create_project(self):
+        self.empty_proj()
+        self.Datas_generales=[]
+        self.Images_names=[]
+        self.Images=[]
+        self.save_as()
+        self.update_show()
+        self.prepare_GUI_with_proj()
+        self.afficher()
+        self.afficher_min()
 
 
     def On_mousewheel(self,event):
@@ -432,62 +516,69 @@ class Interface(Frame):
             self.Can_Miniature_img.config(width=int(self.SizeMin_cut[1]), height=int(self.SizeMin_cut[0]))
             self.Can_Miniature_img.itemconfig(self.can_min, image=self.min_show)
 
-    def afficher(self, Coos=(-100, -100)):
-        Size = self.Images[self.Current_img].shape
-        max_X = 1100
-        max_Y = max_X / (Size[1] / Size[0])
-
-        self.TMP_image_to_show = self.transfo_img(self.Current_img)
-        if self.pt_selected == None and self.tool_type.get() == "Pencil":
-            self.TMP_image_to_show = cv2.circle(self.TMP_image_to_show, Coos, self.tool_size, (0, 0, 255), 3)
-
-        self.TMP_image_to_show = cv2.resize(self.TMP_image_to_show,
-                                            (int(Size[1] * self.ratio), int(Size[0] * self.ratio)))
-
-        if self.TMP_image_to_show.shape[1] > max_X or self.TMP_image_to_show.shape[0] > max_Y:
-            diff_x = int(self.TMP_image_to_show.shape[1] - max_X)
-            diff_y = int(self.TMP_image_to_show.shape[0] - max_Y)
-
-            min_x = int((self.center[0] * self.ratio) - (self.TMP_image_to_show.shape[1] - (diff_x)) / 2)
-            max_x = int((self.center[0] * self.ratio) + (self.TMP_image_to_show.shape[1] - (diff_x)) / 2)
-
-            if min_x < 0:
-                min_x = 0
-                max_x = self.TMP_image_to_show.shape[1] - (diff_x)
-
-            if max_x > self.TMP_image_to_show.shape[1]:
-                max_x = self.TMP_image_to_show.shape[1]
-                min_x = diff_x
-
-            min_y = int((self.center[1] * self.ratio) - (self.TMP_image_to_show.shape[0] - (diff_y)) / 2)
-            max_y = int((self.center[1] * self.ratio) + (self.TMP_image_to_show.shape[0] - (diff_y)) / 2)
-
-            if min_y < 0:
-                min_y = 0
-                max_y = int(self.TMP_image_to_show.shape[0] - (diff_y))
-
-            if max_y > self.TMP_image_to_show.shape[0]:
-                max_y = self.TMP_image_to_show.shape[0]
-                min_y = diff_y
-            self.TMP_image_to_show = self.TMP_image_to_show[min_y:max_y, min_x:max_x]
-
-            self.zoom_pts = [[min_x, min_y], [max_x, max_y]]
-
-        if len(self.Images_names[self.Current_img]) > 130:
-            name = self.Images_names[self.Current_img][:3] + "[...]" + self.Images_names[self.Current_img][
-                                                                       len(self.Images_names[self.Current_img]) - 110:]
         else:
-            name = self.Images_names[self.Current_img]
+            self.Can_Miniature_img.delete("all")
 
-        self.TMP_image_to_show = cv2.putText(self.TMP_image_to_show, name, (10, self.TMP_image_to_show.shape[0] - 10),
-                                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
-        self.TMP_image_to_show = cv2.putText(self.TMP_image_to_show, name, (10, self.TMP_image_to_show.shape[0] - 10),
-                                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
-        self.image_to_show2 = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.TMP_image_to_show))
-        self.can_import = self.canvas_main_img.create_image(0, 0, image=self.image_to_show2, anchor=NW)
-        self.canvas_main_img.config(width=int(max_X), height=int(max_Y))
-        self.canvas_main_img.itemconfig(self.can_import, image=self.image_to_show2)
-        self.update()
+    def afficher(self, Coos=(-100, -100)):
+        if len(self.Images)>0:
+            Size = self.Images[self.Current_img].shape
+            max_X = 1100
+            max_Y = max_X / (Size[1] / Size[0])
+
+            self.TMP_image_to_show = self.transfo_img(self.Current_img)
+            if self.pt_selected == None and self.tool_type.get() == "Pencil":
+                self.TMP_image_to_show = cv2.circle(self.TMP_image_to_show, Coos, self.tool_size, (0, 0, 255), 3)
+
+            self.TMP_image_to_show = cv2.resize(self.TMP_image_to_show,
+                                                (int(Size[1] * self.ratio), int(Size[0] * self.ratio)))
+
+            if self.TMP_image_to_show.shape[1] > max_X or self.TMP_image_to_show.shape[0] > max_Y:
+                diff_x = int(self.TMP_image_to_show.shape[1] - max_X)
+                diff_y = int(self.TMP_image_to_show.shape[0] - max_Y)
+
+                min_x = int((self.center[0] * self.ratio) - (self.TMP_image_to_show.shape[1] - (diff_x)) / 2)
+                max_x = int((self.center[0] * self.ratio) + (self.TMP_image_to_show.shape[1] - (diff_x)) / 2)
+
+                if min_x < 0:
+                    min_x = 0
+                    max_x = self.TMP_image_to_show.shape[1] - (diff_x)
+
+                if max_x > self.TMP_image_to_show.shape[1]:
+                    max_x = self.TMP_image_to_show.shape[1]
+                    min_x = diff_x
+
+                min_y = int((self.center[1] * self.ratio) - (self.TMP_image_to_show.shape[0] - (diff_y)) / 2)
+                max_y = int((self.center[1] * self.ratio) + (self.TMP_image_to_show.shape[0] - (diff_y)) / 2)
+
+                if min_y < 0:
+                    min_y = 0
+                    max_y = int(self.TMP_image_to_show.shape[0] - (diff_y))
+
+                if max_y > self.TMP_image_to_show.shape[0]:
+                    max_y = self.TMP_image_to_show.shape[0]
+                    min_y = diff_y
+                self.TMP_image_to_show = self.TMP_image_to_show[min_y:max_y, min_x:max_x]
+
+                self.zoom_pts = [[min_x, min_y], [max_x, max_y]]
+
+            if len(self.Images_names[self.Current_img]) > 130:
+                name = self.Images_names[self.Current_img][:3] + "[...]" + self.Images_names[self.Current_img][
+                                                                           len(self.Images_names[self.Current_img]) - 110:]
+            else:
+                name = self.Images_names[self.Current_img]
+
+            self.TMP_image_to_show = cv2.putText(self.TMP_image_to_show, name, (10, self.TMP_image_to_show.shape[0] - 10),
+                                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
+            self.TMP_image_to_show = cv2.putText(self.TMP_image_to_show, name, (10, self.TMP_image_to_show.shape[0] - 10),
+                                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
+            self.image_to_show2 = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.TMP_image_to_show))
+            self.can_import = self.canvas_main_img.create_image(0, 0, image=self.image_to_show2, anchor=NW)
+            self.canvas_main_img.config(width=int(max_X), height=int(max_Y))
+            self.canvas_main_img.itemconfig(self.can_import, image=self.image_to_show2)
+            self.update()
+
+        else:
+            self.canvas_main_img.delete("all")
 
     def move_pt_mask(self, event, invert=False):
         if int((event.x + self.zoom_pts[0][0]) / self.ratio)<0:
@@ -580,7 +671,6 @@ class Interface(Frame):
             if ((self.shown_col[0])>=int(self.hue_bot.get()) and (self.shown_col[0])<=int(self.hue_top.get())):
                 self.shown_col=[int(self.hue_bot.get()),0]
 
-
         self.img_colors_new = np.copy(self.img_colors)
         self.img_colors_new_r = cv2.resize(self.img_colors_new, (int(Size[1] * 0.5), int(Size[0] * 0.5)))
         self.img_colors_new_r = cv2.cvtColor(self.img_colors_new_r,cv2.COLOR_RGB2BGR)
@@ -628,6 +718,7 @@ class Interface(Frame):
         self.sat3 = cv2.line(saturations, (0, int(self.sat_top.get())),(int(self.canvas_img_sat.winfo_width()), int(self.sat_top.get())), (50, 50, 50), 2)
         self.sat3=cv2.resize(self.sat3,(int(self.canvas_img_sat.winfo_width()),int(self.canvas_img_sat.winfo_height())))
         self.sat_ratio=int(self.canvas_img_sat.winfo_height())/self.saturations.shape[0]
+        print(self.sat_ratio)
         self.sat4 = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.sat3))
         self.canvas_img_sat.create_image(0,0, image=self.sat4, anchor=NW)
 
@@ -656,6 +747,11 @@ class Interface(Frame):
         self.canvas_img_hue.bind("<Button-1>",self.select_col)
         self.canvas_img_hue.bind("<B1-Motion>", self.select_col)
 
+
+
+
+
+
     def move_sat(self, event):
         rgb = np.uint8([[self.saturations[int(event.y/self.sat_ratio),1]]])  # shape: (1,1,3)
         hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
@@ -679,7 +775,11 @@ class Interface(Frame):
         self.update_show()
 
     def drag_sat(self, event):
-        rgb = np.uint8([[self.saturations[int(event.y/self.sat_ratio),1]]])  # shape: (1,1,3)
+        if event.y<0:
+            event.y=0
+        if int(event.y/self.sat_ratio)>255:
+            event.y=int(255*self.sat_ratio)
+        rgb = np.uint8([[self.saturations[int(round(event.y/self.sat_ratio)),1]]])  # shape: (1,1,3)
         hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
         new_val = hsv[0, 0, 1]
 
@@ -724,7 +824,11 @@ class Interface(Frame):
         self.update_show()
 
     def drag_val(self, event):
-        rgb = np.uint8([[self.values[int(event.y/self.val_ratio),1]]])  # shape: (1,1,3)
+        if event.y<0:
+            event.y=0
+        if int(event.y/self.val_ratio)>255:
+            event.y=int(255*self.val_ratio)
+        rgb = np.uint8([[self.values[int(round(event.y/self.val_ratio)),1]]])  # shape: (1,1,3)
         hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
         new_val = hsv[0, 0, 2]
 
@@ -942,9 +1046,17 @@ class Interface(Frame):
                        str(self.actual_pos[1] - self.press_position[1] + self.win_old_pos[1]))
         fenetre.geometry("+".join(deplacement))
 
-    def fermer(self):
-        self.quitter = True
-        fenetre.destroy()
+    def close(self):
+        self.projectmenu.entryconfig(2, state="disabled")
+        self.projectmenu.entryconfig(3, state="disabled")
+        self.projectmenu.entryconfig(4, state="disabled")
+
+        self.prepare_GUI_without_proj()
+
+        self.project_open=False
+
+
+
 
     def save_particles(self):
         load_frame = Loading.Loading(self.canvas_main)  # Progression bar
@@ -996,11 +1108,11 @@ class Interface(Frame):
 
                 for color in ["Yellow","Blue","Red","White"]:
                     for j in range(len(self.Datas_generales[i][color])):
-                        if self.Datas_generales[i][color][j]!=None:
+                        if not (self.Datas_generales[i][color][j] is None):
                             File = self.Datas_generales[i]["File"]
                             Type = color
                             ID = j
-                            Area = cv2.contourArea(self.Datas_generales[i]["Yellow"][j])
+                            Area = cv2.contourArea(self.Datas_generales[i][color][j])
                             Area_mm = Area * (ratio_mm ** 2)
                             hsv = cv2.cvtColor(self.Images[i], cv2.COLOR_RGB2HSV)
                             grey = cv2.cvtColor(self.Images[i], cv2.COLOR_RGB2GRAY)
@@ -1048,20 +1160,27 @@ class Interface(Frame):
             rgb = np.uint8([[self.Images[self.Current_img][Y,X]]])  # shape: (1,1,3)
             hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)[0,0]
 
+            self.position_mouse_x.set("X="+str(X))
+            self.position_mouse_y.set("Y=" + str(Y))
+            self.position_mouse_h.set("Hue=" + str(hsv[0]*2))
+            self.position_mouse_s.set("Sat=" + str(hsv[1]))
+            self.position_mouse_v.set("Val=" + str(hsv[2]))
 
-            self.position_mouse.set("x={0}, y={1}, Hue={2}, Saturation={3}, Value={4}".format(X,Y,hsv[0]*2,hsv[1],hsv[2]))
             self.afficher( (int((event.x + self.zoom_pts[0][0]) / self.ratio), int((event.y + self.zoom_pts[0][1]) / self.ratio)))
 
-
-    def save(self):
-        file_to_save = filedialog.asksaveasfilename(defaultextension=".rfd")
-        Params=[self.hue_bot.get(), self.hue_top.get(), self.sat_bot.get(), self.sat_top.get(),self.val_bot.get(),self.val_top.get()]
-        with open(file_to_save, 'wb') as fp:
+    def save(self, *args):
+        Params=[self.hue_bot.get(), self.hue_top.get(), self.sat_bot.get(), self.sat_top.get(),self.val_bot.get(),self.val_top.get(),self.distance.get()]
+        with open(self.file_project_save, 'wb') as fp:
             pickle.dump((self.Datas_generales, self.Images_names, Params), fp)
 
+    def save_as(self):
+        self.file_project_save = filedialog.asksaveasfilename(defaultextension=".rfd")
+        self.root.title(os.path.basename(self.file_project_save)[0:-4] + " - ColCal")
+        self.save()
+
     def open_file(self):
-        file_to_open = filedialog.askopenfilename()
-        with open(file_to_open, 'rb') as fp:
+        self.file_project_save = filedialog.askopenfilename()
+        with open(self.file_project_save, 'rb') as fp:
             self.Datas_generales, self.Images_names, Params = pickle.load(fp)
 
         self.hue_bot.delete(0, END)
@@ -1084,6 +1203,8 @@ class Interface(Frame):
         self.shown_val = [int(self.val_bot.get()), 0]
         self.update_show()
 
+        self.distance.set(Params[6])
+
         load_frame = Loading.Loading(self.canvas_main)  # Progression bar
         load_frame.show_load(0)
         self.load_images(load_frame)
@@ -1092,8 +1213,47 @@ class Interface(Frame):
         self.afficher()
         self.afficher_min()
         self.update()
+        self.prepare_GUI_with_proj()
 
-    def open_new_seq(self):
+
+    def prepare_GUI_with_proj(self):
+        self.project_open = True
+        self.root.title(os.path.basename(self.file_project_save)[0:-4] + " - ColCal")
+        self.projectmenu.entryconfig(2, state="active")
+        self.projectmenu.entryconfig(3, state="active")
+        self.projectmenu.entryconfig(4, state="active")
+
+        self.canvas_main_img.grid(row=0, column=0, sticky="ns")
+        self.Can_Miniature_img.grid(row=0, column=0, sticky="ns")
+
+        self.menubar.entryconfig("Images", state="active")
+
+        if len(self.Images)>0:
+            self.menubar.entryconfig("Particles detection", state="active")
+            self.Current_img=0
+        else:
+            self.menubar.entryconfig("Particles detection", state="disabled")
+            self.Current_img = 0
+
+    def prepare_GUI_without_proj(self):
+        self.project_open = False
+        self.root.title(os.path.basename(self.file_project_save)[0:-4] + " - ColCal")
+        self.projectmenu.entryconfig(2, state="disabled")
+        self.projectmenu.entryconfig(3, state="disabled")
+        self.projectmenu.entryconfig(4, state="disabled")
+
+        self.canvas_main_img.grid_forget()
+        self.Can_Miniature_img.grid_forget()
+
+        self.menubar.entryconfig("Images", state="disabled")
+        self.menubar.entryconfig("Particles detection", state="disabled")
+
+        self.Entry_dist.delete(0, END)
+        self.Entry_dist.insert(0, "1")
+        self.Current_img = 0
+
+
+    def add_images(self):
         files = filedialog.askopenfilenames()
 
         load_frame = Loading.Loading(self.canvas_main)  # Progression bar
@@ -1105,73 +1265,91 @@ class Interface(Frame):
             file=str(file)
             if os.path.isfile(file) and imghdr.what(file):
                 self.Images_names.append(file)
-            done+=1
 
-        self.automated_findings(load_frame)
-        self.load_images(load_frame)
-        self.afficher()
-        self.afficher_min()
-        self.update()
-
-    def load_images(self,load_frame):
-        self.Images = []
-        first = True
-        compteur = -1
-        count=0
-        for file in self.Images_names:
-            load_frame.show_load(0.5+0.5*(count/len(self.Images_names)))
-            compteur = compteur + 1
             ImG = cv2.imread(file)
             ImG = cv2.cvtColor(ImG, cv2.COLOR_BGR2RGB)
-            self.Images.append(ImG)
-
-            if first:
-                ImG = self.transfo_img(compteur)
-                self.Miniature = ImG
-                first = False
-            else:
-                ImG = self.transfo_img(compteur)
-                self.Miniature = np.concatenate((self.Miniature, ImG), axis=0)
-            count+=1
-
-        SizeMin = self.Miniature.shape
-        self.ratio_min = 400 / SizeMin[1]
-
-        self.Current_img = 0
-        self.Miniature = cv2.resize(self.Miniature,
-                                    (int(SizeMin[1] * self.ratio_min), int(SizeMin[0] * self.ratio_min)))
-        self.SizeMin = self.Miniature.shape
-        self.center = [self.Images[self.Current_img].shape[1] / 2, self.Images[self.Current_img].shape[0] / 2]
-        self.zoom_pts = [[0, 0], list(self.Images[self.Current_img].shape[:2])]
-
-        self.cutted_Miniature = self.Miniature[0:250, 0:self.SizeMin[1]]
-        self.SizeMin_cut = self.cutted_Miniature.shape
-        self.scale_tool_size.configure(to=self.SizeMin[0] - 1)
-        self.afficher_min()
-        load_frame.destroy()
-
-    def automated_findings(self, load_frame):
-        self.Datas_generales = []
-        count=0
-        for file in self.Images_names:
-            load_frame.show_load(0.1 + 0.4 * (count / len(self.Images_names)))
-            ImG = cv2.imread(file)
-            ImG = cv2.cvtColor(ImG, cv2.COLOR_BGR2RGB)
-            Actual_fish_cnt = Fun.find_fish(ImG)
-            pt1, pt2 = Fun.find_scale(ImG, (0,0),(0,0),(0,0))#For yellow scale:(15, 30), (50, 255), (100, 255)
+            Actual_fish_cnt = []
+            pt1, pt2 = [[10,10],[50,10]]
             Actual_particles = []
             Actual_yellow_scale = Fun.color_calib(ImG, "yellow")
             Actual_blue_scale = Fun.color_calib(ImG, "blue")
             Actual_red_scale = Fun.color_calib(ImG, "red")
             Actual_white_scale = Fun.color_calib(ImG, "white")
             self.Datas_generales.append(
-                {"Target":Actual_fish_cnt, "Particles":Actual_particles, "Scale":[pt1, pt2], "Yellow":Actual_yellow_scale, "Blue":Actual_blue_scale,
-                 "Red":Actual_red_scale, "White":Actual_white_scale, "File":file})
-            count+=1
+                {"Target": Actual_fish_cnt, "Particles": Actual_particles, "Scale": [pt1, pt2],
+                 "Yellow": Actual_yellow_scale, "Blue": Actual_blue_scale,
+                 "Red": Actual_red_scale, "White": Actual_white_scale, "File": file})
+            done+=1
+
+        self.load_images(load_frame)
+        self.afficher()
+        self.afficher_min()
+        self.update()
+
+        self.prepare_GUI_with_proj()
+
+        self.canvas_main_img.grid(row=0, column=0, sticky="ns")
+        self.Can_Miniature_img.grid(row=0, column=0, sticky="ns")
+
+
+    def load_images(self,load_frame):
+        self.Images = []
+        first = True
+        compteur = -1
+        count=0
+        if len(self.Images_names)>0:
+            for file in self.Images_names:
+                load_frame.show_load(0.5+0.5*(count/len(self.Images_names)))
+                compteur = compteur + 1
+                ImG = cv2.imread(file)
+                ImG = cv2.cvtColor(ImG, cv2.COLOR_BGR2RGB)
+                self.Images.append(ImG)
+
+                if first:
+                    ImG = self.transfo_img(compteur)
+                    self.Miniature = ImG
+                    first = False
+                else:
+                    ImG = self.transfo_img(compteur)
+                    self.Miniature = np.concatenate((self.Miniature, ImG), axis=0)
+                count+=1
+
+            SizeMin = self.Miniature.shape
+            self.ratio_min = 400 / SizeMin[1]
+
+            self.Current_img = 0
+            self.Miniature = cv2.resize(self.Miniature,
+                                        (int(SizeMin[1] * self.ratio_min), int(SizeMin[0] * self.ratio_min)))
+            self.SizeMin = self.Miniature.shape
+            self.center = [self.Images[self.Current_img].shape[1] / 2, self.Images[self.Current_img].shape[0] / 2]
+            self.zoom_pts = [[0, 0], list(self.Images[self.Current_img].shape[:2])]
+
+            self.cutted_Miniature = self.Miniature[0:250, 0:self.SizeMin[1]]
+            self.SizeMin_cut = self.cutted_Miniature.shape
+            self.scale_tool_size.configure(to=self.SizeMin[0] - 1)
+            self.afficher_min()
+        load_frame.destroy()
+
+    def automated_findings2(self):
+        load_frame = Loading.Loading(self.canvas_main)  # Progression bar
+        load_frame.show_load(0)
+
+        done=0
+        for img in self.Images:
+            self.Datas_generales[done]["Target"]=Fun.find_target(img)
+            self.Datas_generales[done]["Particles"]=[]
+            done+=1
+
+        self.afficher()
+        self.afficher_min()
+        load_frame.destroy()
+
+    def automated_findings(self):
+        newWindow = Toplevel(self.root.master)
+        interface = Auto_detection.Auto_param_interface(parent=newWindow)
 
 
 fenetre = Tk()
-fenetre.overrideredirect(1)
-fenetre.geometry("+100+100")
+fenetre.title("No project - ColCal")
 interface = Interface(fenetre)
 interface.mainloop()

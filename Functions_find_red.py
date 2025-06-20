@@ -3,7 +3,7 @@ import numpy as np
 from scipy.interpolate import splprep, splev
 
 
-def find_fish(image):
+def find_target(image):
     source_img_grey = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     ret, Binary_image = cv2.threshold(source_img_grey, 50, 255, cv2.THRESH_BINARY)
     kernel = np.ones((7, 7), np.uint8)
@@ -41,6 +41,7 @@ def find_fish(image):
     return(smoothened)
 
 def find_red(image,fish,hue,sat,intensity):
+    print("Find red")
     image_grey=cv2.cvtColor(image,cv2.COLOR_RGB2GRAY)
     cimg = np.zeros_like(image_grey)
 
