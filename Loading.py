@@ -6,6 +6,7 @@ class Loading(Frame):
     def __init__(self, parent):
         Frame.__init__(self, parent, bd=5)
         self.grid()
+        self.grab_set()
 
         self.loading_canvas = Frame(self)
         self.loading_canvas.grid(row=4, columnspan=2)

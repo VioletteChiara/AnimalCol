@@ -1,51 +1,6 @@
 import cv2
 import numpy as np
-import os
-from tkinter import filedialog
-from statistics import mean
-import csv
-import math
 from scipy.interpolate import splprep, splev
-
-
-def find_fish_old(image):
-    source_img_grey = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-    ret, Binary_image = cv2.threshold(source_img_grey, 50, 255, cv2.THRESH_BINARY)
-    kernel = np.ones((7, 7), np.uint8)
-    Binary_image = cv2.erode(Binary_image, kernel, iterations=3)
-    Binary_image = cv2.dilate(Binary_image, kernel, iterations=7)
-    Binary_image = cv2.erode(Binary_image, kernel, iterations=2)
-
-    contours, _ = cv2.findContours(Binary_image, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-
-    filtered_contours = []
-    for cnt in contours:
-        area = cv2.contourArea(cnt)
-        M = cv2.moments(cnt)
-        cX = int(M["m10"] / M["m00"])
-        cY = int(M["m01"] / M["m00"])
-        if cX > 730 and cX < 3500 and cY > 900 and cY < 2300:
-            if area > 50000 and area < 1000000:
-                filtered_contours.append(cnt)
-
-    smoothened=[]
-    for cnt in filtered_contours:
-        x, y = cnt.T
-        # Convert from numpy arrays to normal arrays
-        x = x.tolist()[0]
-        y = y.tolist()[0]
-        # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splprep.html
-        tck, u = splprep([x, y], k=3, u=None, s=1.0, per=1)
-        # https://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.linspace.html
-        u_new = np.linspace(u.min(), u.max(), 50)
-        # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
-        x_new, y_new = splev(u_new, tck, der=0)
-        # Convert it back to numpy format for opencv to be able to display it
-        res_array = [[[int(i[0]), int(i[1])]] for i in zip(x_new, y_new)]
-        smoothened.append(np.asarray(res_array, dtype=np.int32))
-
-
-    return(smoothened)
 
 
 def find_fish(image):
@@ -83,8 +38,6 @@ def find_fish(image):
         # Convert it back to numpy format for opencv to be able to display it
         res_array = [[[int(i[0]), int(i[1])]] for i in zip(x_new, y_new)]
         smoothened.append(np.asarray(res_array, dtype=np.int32))
-
-
     return(smoothened)
 
 def find_red(image,fish,hue,sat,intensity):
@@ -217,7 +170,6 @@ def color_calib(image, color):
             cnt_ret=filtered_contours[0]
         else:
             cnt_ret = None
-
 
     return([cnt_ret])
 
