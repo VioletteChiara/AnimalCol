@@ -147,7 +147,7 @@ class Interface(Frame):
 
         self.particlesmenu = Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Particles detection", menu=self.particlesmenu)
-        #self.particlesmenu.add_command(label="Automatic target detection", command=self.automated_findings)
+        self.particlesmenu.add_command(label="Automatic target detection", command=self.automated_findings)
         self.particlesmenu.add_command(label="Export particles", command=self.save_particles)
         self.menubar.entryconfig("Particles detection", state="disabled")
 
@@ -718,7 +718,6 @@ class Interface(Frame):
         self.sat3 = cv2.line(saturations, (0, int(self.sat_top.get())),(int(self.canvas_img_sat.winfo_width()), int(self.sat_top.get())), (50, 50, 50), 2)
         self.sat3=cv2.resize(self.sat3,(int(self.canvas_img_sat.winfo_width()),int(self.canvas_img_sat.winfo_height())))
         self.sat_ratio=int(self.canvas_img_sat.winfo_height())/self.saturations.shape[0]
-        print(self.sat_ratio)
         self.sat4 = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.sat3))
         self.canvas_img_sat.create_image(0,0, image=self.sat4, anchor=NW)
 
@@ -964,11 +963,9 @@ class Interface(Frame):
     def callback_mask(self, event, invert=False):
         X = (event.x + self.zoom_pts[0][0]) / self.ratio
         Y = (event.y + self.zoom_pts[0][1]) / self.ratio
-        if math.sqrt((X - self.Datas_generales[self.Current_img]["Scale"][0][0]) ** 2 + (
-                Y - self.Datas_generales[self.Current_img]["Scale"][0][1]) ** 2) < 20:
+        if math.sqrt((X - self.Datas_generales[self.Current_img]["Scale"][0][0]) ** 2 + (Y - self.Datas_generales[self.Current_img]["Scale"][0][1]) ** 2) < 20:
             self.pt_selected = 1
-        elif math.sqrt((X - self.Datas_generales[self.Current_img]["Scale"][1][0]) ** 2 + (
-                Y - self.Datas_generales[self.Current_img]["Scale"][1][1]) ** 2) < 20:
+        elif math.sqrt((X - self.Datas_generales[self.Current_img]["Scale"][1][0]) ** 2 + (Y - self.Datas_generales[self.Current_img]["Scale"][1][1]) ** 2) < 20:
             self.pt_selected = 2
 
         elif self.tool_type.get() == "Poly":
@@ -1153,20 +1150,23 @@ class Interface(Frame):
             self.afficher()
 
     def affiche_mouse(self, event):
-        if len(self.Images) > 0:
-            X = int(round((event.x + self.zoom_pts[0][0]) / self.ratio, 1))
-            Y = int(round((event.y + self.zoom_pts[0][1]) / self.ratio, 1))
+        try:
+            if len(self.Images) > 0:
+                X = int(round((event.x + self.zoom_pts[0][0]) / self.ratio, 1))
+                Y = int(round((event.y + self.zoom_pts[0][1]) / self.ratio, 1))
 
-            rgb = np.uint8([[self.Images[self.Current_img][Y,X]]])  # shape: (1,1,3)
-            hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)[0,0]
+                rgb = np.uint8([[self.Images[self.Current_img][Y,X]]])  # shape: (1,1,3)
+                hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)[0,0]
 
-            self.position_mouse_x.set("X="+str(X))
-            self.position_mouse_y.set("Y=" + str(Y))
-            self.position_mouse_h.set("Hue=" + str(hsv[0]*2))
-            self.position_mouse_s.set("Sat=" + str(hsv[1]))
-            self.position_mouse_v.set("Val=" + str(hsv[2]))
+                self.position_mouse_x.set("X="+str(X))
+                self.position_mouse_y.set("Y=" + str(Y))
+                self.position_mouse_h.set("Hue=" + str(hsv[0]*2))
+                self.position_mouse_s.set("Sat=" + str(hsv[1]))
+                self.position_mouse_v.set("Val=" + str(hsv[2]))
 
-            self.afficher( (int((event.x + self.zoom_pts[0][0]) / self.ratio), int((event.y + self.zoom_pts[0][1]) / self.ratio)))
+                self.afficher( (int((event.x + self.zoom_pts[0][0]) / self.ratio), int((event.y + self.zoom_pts[0][1]) / self.ratio)))
+        except:
+            pass
 
     def save(self, *args):
         Params=[self.hue_bot.get(), self.hue_top.get(), self.sat_bot.get(), self.sat_top.get(),self.val_bot.get(),self.val_top.get(),self.distance.get()]
@@ -1269,7 +1269,7 @@ class Interface(Frame):
             ImG = cv2.imread(file)
             ImG = cv2.cvtColor(ImG, cv2.COLOR_BGR2RGB)
             Actual_fish_cnt = []
-            pt1, pt2 = [[10,10],[50,10]]
+            pt1, pt2 = [[25,50],[100,50]]
             Actual_particles = []
             Actual_yellow_scale = Fun.color_calib(ImG, "yellow")
             Actual_blue_scale = Fun.color_calib(ImG, "blue")
@@ -1330,23 +1330,9 @@ class Interface(Frame):
             self.afficher_min()
         load_frame.destroy()
 
-    def automated_findings2(self):
-        load_frame = Loading.Loading(self.canvas_main)  # Progression bar
-        load_frame.show_load(0)
-
-        done=0
-        for img in self.Images:
-            self.Datas_generales[done]["Target"]=Fun.find_target(img)
-            self.Datas_generales[done]["Particles"]=[]
-            done+=1
-
-        self.afficher()
-        self.afficher_min()
-        load_frame.destroy()
-
     def automated_findings(self):
         newWindow = Toplevel(self.root.master)
-        interface = Auto_detection.Auto_param_interface(parent=newWindow)
+        interface = Auto_detection.Auto_param_interface(parent=newWindow, list_vids=self.Images_names, boss=self, curr_vid=self.Current_img)
 
 
 fenetre = Tk()
