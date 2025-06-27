@@ -15,6 +15,8 @@ import imghdr
 import User_loading
 import Auto_detection
 import Vid_list
+from functools import partial
+import Canvas_images
 
 class Interface(Frame):
     def __init__(self, fenetre, **kwargs):
@@ -35,7 +37,6 @@ class Interface(Frame):
         self.which_tool = "Target"  # "Scale_R","Scale_B","Scale_Y","Fish","Red"
         self.tool_size = 50
         self.pt_selected = None
-        self.ratio = 0.25
         self.angle1 = 0
         self.angle2 = 0
         self.SizeMin = [10, 10]
@@ -46,8 +47,6 @@ class Interface(Frame):
         self.tool_add = IntVar()
         self.tool_add.set(1)
 
-
-
         Param_file = User_loading.resource_path(os.path.join("Settings"))
         with open(Param_file, 'rb') as fp:
             Params = pickle.load(fp)
@@ -56,11 +55,8 @@ class Interface(Frame):
 
         #No images yet
         self.Images_names = []
-
         self.project_open=False
-
         self.param_find_targets=[0,0,0,5000,1000000,0]
-
 
         # Canvas:
         # Barre de titre
@@ -78,10 +74,15 @@ class Interface(Frame):
         self.canvas_main = Canvas(fenetre, height=20, bd=2, highlightthickness=1, relief='ridge')
         self.canvas_main.grid(row=1, column=0, sticky="nsew")
 
-        self.canvas_main.columnconfigure(0, weight=1)
-        self.canvas_main.rowconfigure(0, weight=1)
+        # This is the right way to let children expand inside canvas_main
+        self.canvas_main.grid_columnconfigure(0, weight=1)
+        self.canvas_main.grid_rowconfigure(0, weight=1)
+        self.canvas_main.grid_rowconfigure(1, weight=0)  # button bar doesn't expand vertically
 
-        self.canvas_main_img = Canvas(self.canvas_main, height=20, bd=2, highlightthickness=1, relief='ridge')
+        self.blank = np.zeros((500, 500, 3), np.uint8)
+        self.blank.fill(255)
+        self.Current_img = 0
+        self.canvas_main_img = Canvas_images.Image_show(self.canvas_main, self, self.blank)
         self.canvas_main_img.grid(row=0, column=0, sticky="nsew")
 
         self.canvas_main_but = Canvas(self.canvas_main, height=20, bd=2, highlightthickness=1, relief='ridge')
@@ -93,7 +94,6 @@ class Interface(Frame):
         self.Image_suiv = Button(self.canvas_main_but, text="Next frame", command=self.suivant)
         self.Image_suiv.grid(row=0, column=1, sticky="w")
 
-
         # Right pannel
         self.canvas_user = Canvas(fenetre, height=100, width=100, bd=2, highlightthickness=1, relief='flat')
         self.canvas_user.grid(row=1, column=1, sticky="nse")
@@ -102,7 +102,6 @@ class Interface(Frame):
         self.canvas_user.rowconfigure(2, weight=1)
         self.canvas_user.rowconfigure(3, weight=1)
         self.canvas_user.rowconfigure(4, weight=1)
-
 
         # Widgets:
         # Barre de suivi de curseur
@@ -175,34 +174,8 @@ class Interface(Frame):
         self.optionsmenu.add_command(label=text, command=self.change_auto_part)
         self.root.config(menu=self.menubar)
 
-        '''
-        self.bouton_New_images = Button(self.canvas_title_bar, text="Add images", command=self.open_new_seq)
-        self.bouton_New_images.grid(row=0, column=2, sticky="e")
-        self.bouton_New_images.config(state="disabled")
-
-        self.bouton_Open = Button(self.canvas_title_bar, text="Open project", command=self.open_file)
-        self.bouton_Open.grid(row=0, column=3, sticky="e")
-
-        self.bouton_Save = Button(self.canvas_title_bar, text="Save", command=self.save)
-        self.bouton_Save.grid(row=0, column=4, sticky="e")
-
-        self.bouton_Save_Particles = Button(self.canvas_title_bar, text="Export particles", command=self.save_particles)
-        self.bouton_Save_Particles.grid(row=0, column=5, sticky="e")
-        self.bouton_Save_Particles.config(state="disabled")
-        '''
-
-        # Visualisation de la video
-        self.canvas_main_img.bind("<Button-1>", self.callback_mask)
-        self.canvas_main_img.bind("<B1-Motion>", self.move_pt_mask)
-        self.canvas_main_img.bind("<ButtonRelease - 1>", self.end_move)
-
-        self.canvas_main_img.bind("<Button-3>", self.callback_mask_R)
-        self.canvas_main_img.bind("<B3-Motion>", self.move_pt_mask_R)
-        self.canvas_main_img.bind("<ButtonRelease - 3>", self.end_move)
 
 
-        self.canvas_main_img.bind("<Motion>", self.affiche_mouse)
-        self.canvas_main_img.bind("<space>", self.Change_add)
 
         # Right pannel
         # Visualisation du blanc
@@ -281,7 +254,7 @@ class Interface(Frame):
         self.val_top.grid(row=2, column=2)
         self.val_top.bind("<Return>", self.update_show)
 
-        self.bouton_Valider = Button(self.canvas_choice_couleurs, text="Validate", fg="white", bg="green", command=self.validate)
+        self.bouton_Valider = Button(self.canvas_choice_couleurs, text="Validate", fg="white", bg="green", command=partial(self.update_show, True))
         self.bouton_Valider.grid(row=2, column=3, sticky="e")
 
         self.bouton_Valider_all = Button(self.canvas_choice_couleurs, text="Validate all", fg="white", bg="red",
@@ -380,6 +353,8 @@ class Interface(Frame):
         self.update()
         self.update_show()
 
+        self.zoom_sq = [[0, 0], [0, 0]]
+
     def change_auto_part(self):
         self.auto_update= not self.auto_update
         if self.auto_update:
@@ -397,17 +372,17 @@ class Interface(Frame):
         self.hue_bot.delete(0, END)
         self.hue_bot.insert(0, "0")
         self.hue_top.delete(0, END)
-        self.hue_top.insert(0, "360")
+        self.hue_top.insert(0, "1")
 
         self.sat_bot.delete(0, END)
         self.sat_bot.insert(0, "0")
         self.sat_top.delete(0, END)
-        self.sat_top.insert(0, "255")
+        self.sat_top.insert(0, "0")
 
         self.val_bot.delete(0, END)
         self.val_bot.insert(0, "0")
         self.val_top.delete(0, END)
-        self.val_top.insert(0, "255")
+        self.val_top.insert(0, "0")
 
         self.Entry_dist.delete(0, END)
         self.Entry_dist.insert(0, "1")
@@ -421,7 +396,7 @@ class Interface(Frame):
         self.save_as()
         self.update_show()
         self.prepare_GUI_with_proj()
-        self.afficher()
+        self.modif_image()
         self.afficher_min()
 
 
@@ -434,11 +409,7 @@ class Interface(Frame):
                     self.scale_tool_size.set(new_pos)
                     self.defile(int(new_pos))
 
-            else:
-                self.center=[(event.x+ self.zoom_pts[0][0])/self.ratio,(event.y+ self.zoom_pts[0][1])/self.ratio]
-                Delta=(event.delta/30)
-                self.ratio = self.ratio+(Delta/240)
-                self.afficher()
+
 
     def callback_miniature(self, event):
         Position = self.defilement.get() - (250 - event.y)
@@ -459,7 +430,7 @@ class Interface(Frame):
                 else:
                     self.Image_prec.config(state="normal")
 
-                self.afficher()
+                self.modif_image()
                 break
 
     def defile(self, val):
@@ -472,50 +443,62 @@ class Interface(Frame):
             self.Can_Miniature_img.itemconfig(self.can_min, image=self.min_show)
             self.update()
 
+    def modif_image(self, show=None):
+        self.img_to_show=self.transfo_img(self.Current_img)
+        tmp_img = self.img_to_show.copy()
+        if not show is None:
+            tmp_img = cv2.circle(tmp_img, show, self.tool_size, (255, 0, 0),
+                                 max([1, int(2 * self.canvas_main_img.ratio)]))
+        self.canvas_main_img.afficher_img(tmp_img)
+
+
     def transfo_img(self, image_ID):
-        overlay = np.zeros(self.Images[image_ID].shape, dtype=np.uint8)
-        for particle in range(len(self.Datas_generales[image_ID]["Particles"])):
-            overlay = cv2.drawContours(overlay, self.Datas_generales[image_ID]["Particles"][particle], -1, (0, 0, 255), -1)
-        opacity = 0.75
+        if len(self.Images)>0:
+            overlay = np.zeros(self.Images[image_ID].shape, dtype=np.uint8)
+            for particle in range(len(self.Datas_generales[image_ID]["Particles"])):
+                overlay = cv2.drawContours(overlay, self.Datas_generales[image_ID]["Particles"][particle], -1, (0, 0, 255), -1)
+            opacity = 0.75
 
-        TMP_image = np.copy(self.Images[image_ID])
+            TMP_image = np.copy(self.Images[image_ID])
 
-        # Echelle
-        TMP_image = cv2.line(TMP_image, tuple(self.Datas_generales[image_ID]["Scale"][0]),
-                             tuple(self.Datas_generales[image_ID]["Scale"][1]), (255, 0, 150), 3)
-        TMP_image = cv2.circle(TMP_image, tuple(self.Datas_generales[image_ID]["Scale"][0]),
-                               10, (255, 0, 0), 2)
-        TMP_image = cv2.circle(TMP_image, tuple(self.Datas_generales[image_ID]["Scale"][1]),
-                               10, (255, 0, 0), 2)
+            # Echelle
+            TMP_image = cv2.line(TMP_image, tuple(self.Datas_generales[image_ID]["Scale"][0]),
+                                 tuple(self.Datas_generales[image_ID]["Scale"][1]), (255, 0, 150), 3)
+            TMP_image = cv2.circle(TMP_image, tuple(self.Datas_generales[image_ID]["Scale"][0]),
+                                   10, (255, 0, 0), 2)
+            TMP_image = cv2.circle(TMP_image, tuple(self.Datas_generales[image_ID]["Scale"][1]),
+                                   10, (255, 0, 0), 2)
 
-        # Selection_Poly
-        for pt in range(len(self.pt_Poly)):
-            TMP_image = cv2.circle(TMP_image, tuple(self.pt_Poly[pt]), 10, (0, 255, 0), -1)
-            if pt > 0:
-                TMP_image = cv2.line(TMP_image, tuple(self.pt_Poly[pt - 1]), tuple(self.pt_Poly[pt]), (0, 255, 0), 2)
+            # Selection_Poly
+            for pt in range(len(self.pt_Poly)):
+                TMP_image = cv2.circle(TMP_image, tuple(self.pt_Poly[pt]), 10, (0, 255, 0), -1)
+                if pt > 0:
+                    TMP_image = cv2.line(TMP_image, tuple(self.pt_Poly[pt - 1]), tuple(self.pt_Poly[pt]), (0, 255, 0), 2)
 
-        TMP_image = cv2.addWeighted(TMP_image, 1, overlay, opacity, 0)
+            TMP_image = cv2.addWeighted(TMP_image, 1, overlay, opacity, 0)
 
-        if self.Datas_generales[image_ID]["Target"] is not None:
-            TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Target"], -1, (250, 0, 0), 4)
+            if self.Datas_generales[image_ID]["Target"] is not None:
+                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Target"], -1, (250, 0, 0), 4)
 
-        if self.Datas_generales[image_ID]["Particles"] is not None:
-            for target in range(len(self.Datas_generales[image_ID]["Particles"])):
-                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Particles"][target], -1, (0, 0, 250), 2)
+            if self.Datas_generales[image_ID]["Particles"] is not None:
+                for target in range(len(self.Datas_generales[image_ID]["Particles"])):
+                    TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Particles"][target], -1, (0, 0, 250), 2)
 
-        if len(self.Datas_generales[image_ID]["Red"]) > 0 and self.Datas_generales[image_ID]["Red"][0] is not None:
-            TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Red"], -1, (150, 0, 0), 10)
+            if len(self.Datas_generales[image_ID]["Red"]) > 0 and self.Datas_generales[image_ID]["Red"][0] is not None:
+                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Red"], -1, (150, 0, 0), 10)
 
-        if len(self.Datas_generales[image_ID]["Blue"]) > 0 and self.Datas_generales[image_ID]["Blue"][0] is not None:
-            TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Blue"], -1, (0, 0, 150), 10)
+            if len(self.Datas_generales[image_ID]["Blue"]) > 0 and self.Datas_generales[image_ID]["Blue"][0] is not None:
+                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Blue"], -1, (0, 0, 150), 10)
 
-        if len(self.Datas_generales[image_ID]["Yellow"]) > 0 and self.Datas_generales[image_ID]["Yellow"][0] is not None:
-            TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Yellow"], -1, (150, 150, 2), 10)
+            if len(self.Datas_generales[image_ID]["Yellow"]) > 0 and self.Datas_generales[image_ID]["Yellow"][0] is not None:
+                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Yellow"], -1, (150, 150, 2), 10)
 
-        if len(self.Datas_generales[image_ID]["White"]) > 0 and self.Datas_generales[image_ID]["White"][0] is not None:
-            TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["White"], -1, (200, 200, 200), 10)
+            if len(self.Datas_generales[image_ID]["White"]) > 0 and self.Datas_generales[image_ID]["White"][0] is not None:
+                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["White"], -1, (200, 200, 200), 10)
 
-        return (TMP_image)
+            return (TMP_image)
+        else:
+            return(self.blank)
 
     def afficher_min(self):
         if len(self.Images) > 0:
@@ -552,134 +535,70 @@ class Interface(Frame):
         else:
             self.Can_Miniature_img.delete("all")
 
-    def afficher(self, Coos=(-100, -100)):
-        if len(self.Images)>0:
-            Size = self.Images[self.Current_img].shape
-            max_X = 1100
-            max_Y = max_X / (Size[1] / Size[0])
 
-            self.TMP_image_to_show = self.transfo_img(self.Current_img)
-            if self.pt_selected == None and self.tool_type.get() == "Pencil":
-                self.TMP_image_to_show = cv2.circle(self.TMP_image_to_show, Coos, self.tool_size, (0, 0, 255), 3)
+    def moved_can_right(self, pos, event):
+        self.moved_can(pos, event,invert=True)
 
-            self.TMP_image_to_show = cv2.resize(self.TMP_image_to_show,
-                                                (int(Size[1] * self.ratio), int(Size[0] * self.ratio)))
+    def moved_can(self, pos, event, invert=False):
+        if not bool(event.state & 0x20000):
+            pos=list(pos)
+            pos[0]=int(pos[0])
+            pos[1] = int(pos[1])
+            if self.pt_selected != None:
+                if self.pt_selected == 1:
+                    self.Datas_generales[self.Current_img]["Scale"][0][0] = pos[0]
+                    self.Datas_generales[self.Current_img]["Scale"][0][1] = pos[1]
+                    self.modif_image()
+                elif self.pt_selected == 2:
+                    self.Datas_generales[self.Current_img]["Scale"][1][0] = pos[0]
+                    self.Datas_generales[self.Current_img]["Scale"][1][1] = pos[1]
+                    self.modif_image()
 
-            if self.TMP_image_to_show.shape[1] > max_X or self.TMP_image_to_show.shape[0] > max_Y:
-                diff_x = int(self.TMP_image_to_show.shape[1] - max_X)
-                diff_y = int(self.TMP_image_to_show.shape[0] - max_Y)
+                elif self.pt_selected > 2:
+                    self.pt_Poly[self.pt_selected - 3][0] = pos[0]
+                    self.pt_Poly[self.pt_selected - 3][1] = pos[1]
+                    self.modif_image()
 
-                min_x = int((self.center[0] * self.ratio) - (self.TMP_image_to_show.shape[1] - (diff_x)) / 2)
-                max_x = int((self.center[0] * self.ratio) + (self.TMP_image_to_show.shape[1] - (diff_x)) / 2)
+            elif self.tool_type.get() == "Pencil":
+                if self.tool_add.get():
+                    color = 255
+                else:
+                    color = 0
 
-                if min_x < 0:
-                    min_x = 0
-                    max_x = self.TMP_image_to_show.shape[1] - (diff_x)
+                if invert:
+                    color=255-color
 
-                if max_x > self.TMP_image_to_show.shape[1]:
-                    max_x = self.TMP_image_to_show.shape[1]
-                    min_x = diff_x
+                grey = cv2.cvtColor(self.Images[self.Current_img], cv2.COLOR_RGB2GRAY)
+                mask = np.zeros(grey.shape, dtype=np.uint8)
+                if len(self.Datas_generales[self.Current_img][self.which_tool.get()]) > 0 and np.any(self.Datas_generales[self.Current_img][self.which_tool.get()][0] != None):
+                    mask = cv2.drawContours(mask, self.Datas_generales[self.Current_img][self.which_tool.get()], -1, (255), -1)
+                print(self.last_pt)
+                cv2.line(mask, pos, self.last_pt, (color), int(self.tool_size*2))
+                New_cnts, _ = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+                self.Datas_generales[self.Current_img][self.which_tool.get()] = New_cnts
 
-                min_y = int((self.center[1] * self.ratio) - (self.TMP_image_to_show.shape[0] - (diff_y)) / 2)
-                max_y = int((self.center[1] * self.ratio) + (self.TMP_image_to_show.shape[0] - (diff_y)) / 2)
+            self.last_pt=pos
 
-                if min_y < 0:
-                    min_y = 0
-                    max_y = int(self.TMP_image_to_show.shape[0] - (diff_y))
-
-                if max_y > self.TMP_image_to_show.shape[0]:
-                    max_y = self.TMP_image_to_show.shape[0]
-                    min_y = diff_y
-                self.TMP_image_to_show = self.TMP_image_to_show[min_y:max_y, min_x:max_x]
-
-                self.zoom_pts = [[min_x, min_y], [max_x, max_y]]
-
-            if len(self.Images_names[self.Current_img]) > 130:
-                name = self.Images_names[self.Current_img][:3] + "[...]" + self.Images_names[self.Current_img][
-                                                                           len(self.Images_names[self.Current_img]) - 110:]
-            else:
-                name = self.Images_names[self.Current_img]
-
-            self.TMP_image_to_show = cv2.putText(self.TMP_image_to_show, name, (10, self.TMP_image_to_show.shape[0] - 10),
-                                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
-            self.TMP_image_to_show = cv2.putText(self.TMP_image_to_show, name, (10, self.TMP_image_to_show.shape[0] - 10),
-                                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
-            self.image_to_show2 = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.TMP_image_to_show))
-            self.can_import = self.canvas_main_img.create_image(0, 0, image=self.image_to_show2, anchor=NW)
-            self.canvas_main_img.config(width=int(max_X), height=int(max_Y))
-            self.canvas_main_img.itemconfig(self.can_import, image=self.image_to_show2)
-            self.update()
-
-        else:
-            self.canvas_main_img.delete("all")
-
-    def move_pt_mask(self, event, invert=False):
-        if int((event.x + self.zoom_pts[0][0]) / self.ratio)<0:
-            event.x= 0
-
-        elif int((event.x + self.zoom_pts[0][0]) / self.ratio)>self.Images[self.Current_img].shape[1]:
-            event.x=(self.Images[self.Current_img].shape[1]*self.ratio) - self.zoom_pts[0][0]
-
-        if int((event.y + self.zoom_pts[0][1]) / self.ratio)<0:
-            event.y= 0
-
-        elif int((event.y + self.zoom_pts[0][1]) / self.ratio)>self.Images[self.Current_img].shape[0]:
-            event.y=(self.Images[self.Current_img].shape[0]*self.ratio) - self.zoom_pts[0][1]
+            self.modif_image(show=pos)
 
 
-        if self.pt_selected != None:
-            if self.pt_selected == 1:
-                self.Datas_generales[self.Current_img]["Scale"][0][0] = int((event.x + self.zoom_pts[0][0]) / self.ratio)
-                self.Datas_generales[self.Current_img]["Scale"][0][1] = int((event.y + self.zoom_pts[0][1]) / self.ratio)
-                self.afficher()
-            elif self.pt_selected == 2:
-                self.Datas_generales[self.Current_img]["Scale"][1][0] = int((event.x + self.zoom_pts[0][0]) / self.ratio)
-                self.Datas_generales[self.Current_img]["Scale"][1][1] = int((event.y + self.zoom_pts[0][1]) / self.ratio)
-                self.afficher()
 
-            elif self.pt_selected > 2:
-                self.pt_Poly[self.pt_selected - 3][0] = int((event.x + self.zoom_pts[0][0]) / self.ratio)
-                self.pt_Poly[self.pt_selected - 3][1] = int((event.y + self.zoom_pts[0][1]) / self.ratio)
-                self.afficher()
-
-        elif self.tool_type.get() == "Pencil":
-            if self.tool_add.get():
-                color = 255
-            else:
-                color = 0
-
-            if invert:
-                color=255-color
-
-            grey = cv2.cvtColor(self.Images[self.Current_img], cv2.COLOR_RGB2GRAY)
-            mask = np.zeros(grey.shape, dtype=np.uint8)
-            if len(self.Datas_generales[self.Current_img][self.which_tool.get()]) > 0 and np.any(self.Datas_generales[self.Current_img][self.which_tool.get()][0] != None):
-                mask = cv2.drawContours(mask, self.Datas_generales[self.Current_img][self.which_tool.get()], -1, (255), -1)
-            cv2.line(mask, (int((event.x + self.zoom_pts[0][0]) / self.ratio), int((event.y + self.zoom_pts[0][1]) / self.ratio)), (int((self.last_pt.x + self.zoom_pts[0][0]) / self.ratio), int((self.last_pt.y + self.zoom_pts[0][1]) / self.ratio)), (color), int(self.tool_size*2))
-            New_cnts, _ = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-            self.Datas_generales[self.Current_img][self.which_tool.get()] = New_cnts
-
-        self.last_pt=event
-        self.afficher((int((event.x + self.zoom_pts[0][0]) / self.ratio), int((event.y + self.zoom_pts[0][1]) / self.ratio)))
-
-    def move_pt_mask_R(self, event):
-        self.move_pt_mask(event, invert=True)
-
-    def end_move(self, event):
+    def released_can(self, event):
         self.pt_selected = None
         self.last_pt=None
-        self.afficher((int((event.x + self.zoom_pts[0][0]) / self.ratio), int((event.y + self.zoom_pts[0][1]) / self.ratio)))
         if self.auto_update:
             self.validate()
 
+        self.modif_image()
+
     def Change_add(self, type=None):
+        print("Change")
         if not isinstance(type, (bool)):
             self.tool_add.set(not self.tool_add.get())
         else:
             self.tool_add.set(type)
 
     def validate(self):
-
         if len(self.Images) > 0:
             self.Datas_generales[self.Current_img]["Particles"]=[]
             for fish in range(len(self.Datas_generales[self.Current_img]["Target"])):
@@ -691,11 +610,11 @@ class Interface(Frame):
                                                                          int(float(self.sat_top.get()))), (
                                                                          int(float(self.val_bot.get())),
                                                                          int(float(self.val_top.get())))))
-            self.afficher()
+            self.modif_image()
         self.update()
 
-    def update_show(self, *args):
-        if self.auto_update:
+    def update_show(self, force_auto=False, *args):
+        if self.auto_update or force_auto:
             self.validate()
         Size = self.img_colors.shape
 
@@ -956,7 +875,7 @@ class Interface(Frame):
                                                                  int(float(self.val_bot.get())),
                                                                  int(float(self.val_top.get())))))
             self.afficher_min()
-            self.afficher()
+            self.modif_image()
         self.update()
         load_frame.destroy()
 
@@ -995,13 +914,19 @@ class Interface(Frame):
     def Change_tool_size(self, size):
         self.tool_size = int(size)
 
+    def mouse_over(self, pos):
+        tmp_img=self.img_to_show.copy()
+        tmp_img=cv2.circle(tmp_img,pos,self.tool_size,(255,0,0),max([1,int(2*self.canvas_main_img.ratio)]))
+        self.affiche_mouse(pos)
+        self.canvas_main_img.afficher_img(tmp_img)
 
 
-    def callback_mask(self, event, invert=False):
-        X = (event.x + self.zoom_pts[0][0]) / self.ratio
-        Y = (event.y + self.zoom_pts[0][1]) / self.ratio
 
-        if bool(event.state & 0x4):#If Ctrl is pressed
+    def pressed_can(self, pos, event, invert=False):
+        X = int(pos[0])
+        Y = int(pos[1])
+
+        if bool(event.state & 0x20000):#If Alt is pressed
             rgb = np.uint8([[self.Images[self.Current_img][int(Y), int(X)]]])  # shape: (1,1,3)
             hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)[0, 0]
 
@@ -1098,14 +1023,12 @@ class Interface(Frame):
                 cv2.circle(mask, (int(X), int(Y)),self.tool_size, (color), -1)
                 New_cnts, _ = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
                 self.Datas_generales[self.Current_img][self.which_tool.get()] = New_cnts
-                self.last_pt=event
-            self.afficher((int(X), int(Y)))
+                self.last_pt=[int(X), int(Y)]
+            self.modif_image(show=pos)
 
 
-    def callback_mask_R(self, event):
-        self.callback_mask(event,invert=True)
-
-
+    def right_click(self, pos, event):
+        self.pressed_can(pos, event, invert=True)
 
     def fill_Poly(self, invert=False):
         if self.tool_add.get():
@@ -1127,7 +1050,7 @@ class Interface(Frame):
 
         self.pt_Poly = []
         self.pt_selected = None
-        self.afficher()
+        self.modif_image()
 
     def press_fenetre(self, event):
         self.press_position = pyautogui.position()
@@ -1147,7 +1070,6 @@ class Interface(Frame):
         self.prepare_GUI_without_proj()
 
         self.project_open=False
-
 
 
 
@@ -1230,7 +1152,7 @@ class Interface(Frame):
                 self.Image_prec.config(state="disabled")
             else:
                 self.Image_prec.config(state="normal")
-            self.afficher()
+            self.modif_image()
 
     def precedant(self):
         if self.Current_img > 0:
@@ -1243,13 +1165,13 @@ class Interface(Frame):
                 self.Image_prec.config(state="disabled")
             else:
                 self.Image_prec.config(state="normal")
-            self.afficher()
+            self.modif_image()
 
-    def affiche_mouse(self, event):
+    def affiche_mouse(self, pos):
         try:
             if len(self.Images) > 0:
-                X = int(round((event.x + self.zoom_pts[0][0]) / self.ratio, 1))
-                Y = int(round((event.y + self.zoom_pts[0][1]) / self.ratio, 1))
+                X = pos[0]
+                Y = pos[1]
 
                 rgb = np.uint8([[self.Images[self.Current_img][Y,X]]])  # shape: (1,1,3)
                 hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)[0,0]
@@ -1260,7 +1182,6 @@ class Interface(Frame):
                 self.position_mouse_s.set("Sat=" + str(hsv[1]))
                 self.position_mouse_v.set("Val=" + str(hsv[2]))
 
-                self.afficher( (int((event.x + self.zoom_pts[0][0]) / self.ratio), int((event.y + self.zoom_pts[0][1]) / self.ratio)))
         except:
             pass
 
@@ -1308,7 +1229,7 @@ class Interface(Frame):
         self.load_images(load_frame)
         load_frame.destroy()
 
-        self.afficher()
+        self.canvas_main_img.update_image(self.Images[self.Current_img])
         self.afficher_min()
         self.update()
         self.prepare_GUI_with_proj()
@@ -1321,8 +1242,8 @@ class Interface(Frame):
         self.projectmenu.entryconfig(3, state="active")
         self.projectmenu.entryconfig(4, state="active")
 
-        self.canvas_main_img.grid(row=0, column=0, sticky="ns")
-        self.Can_Miniature_img.grid(row=0, column=0, sticky="ns")
+        self.canvas_main_img.grid(row=0, column=0, sticky="nswe")
+        self.Can_Miniature_img.grid(row=0, column=0, sticky="nsew")
 
         self.menubar.entryconfig("Images", state="active")
 
@@ -1405,14 +1326,14 @@ class Interface(Frame):
             done+=1
 
         self.load_images(load_frame)
-        self.afficher()
+        self.modif_image()
         self.afficher_min()
         self.update()
 
         self.prepare_GUI_with_proj()
 
-        self.canvas_main_img.grid(row=0, column=0, sticky="ns")
-        self.Can_Miniature_img.grid(row=0, column=0, sticky="ns")
+        self.canvas_main_img.grid(row=0, column=0, sticky="nsew")
+        self.Can_Miniature_img.grid(row=0, column=0, sticky="nsew")
 
 
     def load_images(self,load_frame):
@@ -1437,6 +1358,8 @@ class Interface(Frame):
                     self.Miniature = np.concatenate((self.Miniature, ImG), axis=0)
                 count+=1
 
+                print(count)
+
             SizeMin = self.Miniature.shape
             self.ratio_min = 400 / SizeMin[1]
 
@@ -1444,9 +1367,6 @@ class Interface(Frame):
             self.Miniature = cv2.resize(self.Miniature,
                                         (int(SizeMin[1] * self.ratio_min), int(SizeMin[0] * self.ratio_min)))
             self.SizeMin = self.Miniature.shape
-            self.center = [self.Images[self.Current_img].shape[1] / 2, self.Images[self.Current_img].shape[0] / 2]
-            self.zoom_pts = [[0, 0], list(self.Images[self.Current_img].shape[:2])]
-
             self.cutted_Miniature = self.Miniature[0:250, 0:self.SizeMin[1]]
             self.SizeMin_cut = self.cutted_Miniature.shape
             self.scale_tool_size.configure(to=self.SizeMin[0] - 1)
