@@ -12,7 +12,9 @@ import pickle
 import Loading
 import display_colors
 import imghdr
+import User_loading
 import Auto_detection
+import Vid_list
 
 class Interface(Frame):
     def __init__(self, fenetre, **kwargs):
@@ -44,10 +46,20 @@ class Interface(Frame):
         self.tool_add = IntVar()
         self.tool_add.set(1)
 
+
+
+        Param_file = User_loading.resource_path(os.path.join("Settings"))
+        with open(Param_file, 'rb') as fp:
+            Params = pickle.load(fp)
+
+        self.auto_update=Params[0]
+
         #No images yet
         self.Images_names = []
 
         self.project_open=False
+
+        self.param_find_targets=[0,0,0,5000,1000000,0]
 
 
         # Canvas:
@@ -143,6 +155,8 @@ class Interface(Frame):
         self.imagesmenu = Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Images", menu=self.imagesmenu)
         self.imagesmenu.add_command(label="Add new images", command=self.add_images)
+        self.imagesmenu.add_command(label="Remove current image", command=self.remove_image)
+        self.imagesmenu.add_command(label="Remove images", command=self.remove_images)
         self.menubar.entryconfig("Images", state="disabled")
 
         self.particlesmenu = Menu(self.menubar, tearoff=0)
@@ -151,8 +165,15 @@ class Interface(Frame):
         self.particlesmenu.add_command(label="Export particles", command=self.save_particles)
         self.menubar.entryconfig("Particles detection", state="disabled")
 
-        self.root.config(menu=self.menubar)
 
+        if self.auto_update:
+            text="Auto update of particles ✔"
+        else:
+            text="Auto update of particles"
+        self.optionsmenu = Menu(self.menubar, tearoff=0)
+        self.menubar.add_cascade(label="Options", menu=self.optionsmenu)
+        self.optionsmenu.add_command(label=text, command=self.change_auto_part)
+        self.root.config(menu=self.menubar)
 
         '''
         self.bouton_New_images = Button(self.canvas_title_bar, text="Add images", command=self.open_new_seq)
@@ -358,6 +379,18 @@ class Interface(Frame):
         self.shown_val = [int(self.val_bot.get()), 0]
         self.update()
         self.update_show()
+
+    def change_auto_part(self):
+        self.auto_update= not self.auto_update
+        if self.auto_update:
+            text="Auto update of particles ✔"
+        else:
+            text="Auto update of particles"
+        self.optionsmenu.entryconfig(0, label=text)
+
+        Param_file = User_loading.resource_path(os.path.join("Settings"))
+        with open(Param_file, 'wb') as fp:
+            pickle.dump([self.auto_update], fp)
 
 
     def empty_proj(self):
@@ -635,8 +668,9 @@ class Interface(Frame):
     def end_move(self, event):
         self.pt_selected = None
         self.last_pt=None
-        self.afficher(
-            (int((event.x + self.zoom_pts[0][0]) / self.ratio), int((event.y + self.zoom_pts[0][1]) / self.ratio)))
+        self.afficher((int((event.x + self.zoom_pts[0][0]) / self.ratio), int((event.y + self.zoom_pts[0][1]) / self.ratio)))
+        if self.auto_update:
+            self.validate()
 
     def Change_add(self, type=None):
         if not isinstance(type, (bool)):
@@ -645,7 +679,6 @@ class Interface(Frame):
             self.tool_add.set(type)
 
     def validate(self):
-        self.update_show()
 
         if len(self.Images) > 0:
             self.Datas_generales[self.Current_img]["Particles"]=[]
@@ -662,6 +695,8 @@ class Interface(Frame):
         self.update()
 
     def update_show(self, *args):
+        if self.auto_update:
+            self.validate()
         Size = self.img_colors.shape
 
         if int(self.hue_bot.get()) < int(self.hue_top.get()):
@@ -960,50 +995,111 @@ class Interface(Frame):
     def Change_tool_size(self, size):
         self.tool_size = int(size)
 
+
+
     def callback_mask(self, event, invert=False):
         X = (event.x + self.zoom_pts[0][0]) / self.ratio
         Y = (event.y + self.zoom_pts[0][1]) / self.ratio
-        if math.sqrt((X - self.Datas_generales[self.Current_img]["Scale"][0][0]) ** 2 + (Y - self.Datas_generales[self.Current_img]["Scale"][0][1]) ** 2) < 20:
-            self.pt_selected = 1
-        elif math.sqrt((X - self.Datas_generales[self.Current_img]["Scale"][1][0]) ** 2 + (Y - self.Datas_generales[self.Current_img]["Scale"][1][1]) ** 2) < 20:
-            self.pt_selected = 2
 
-        elif self.tool_type.get() == "Poly":
-            compteur = 0
-            pt_find = False
-            while not pt_find and compteur < len(self.pt_Poly):
-                if math.sqrt(
-                        (X - self.pt_Poly[compteur][0]) ** 2 + (Y - self.pt_Poly[compteur][1]) ** 2) < 20:
-                    pt_find = True
-                    if compteur != 0 or len(self.pt_Poly) == 1:
-                        self.pt_selected = 3 + compteur
-                    if compteur == 0:
-                        self.fill_Poly(invert)
-                compteur = compteur + 1
+        if bool(event.state & 0x4):#If Ctrl is pressed
+            rgb = np.uint8([[self.Images[self.Current_img][int(Y), int(X)]]])  # shape: (1,1,3)
+            hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)[0, 0]
 
-            if not pt_find:
-                self.pt_Poly.append([int(X), int(Y)])
-                self.pt_selected = len(self.pt_Poly) + 3 - 1
+            #Change Hue
+            diff_bot=min([abs((360-(int(hsv[0])*2))-int(self.hue_bot.get())),abs((int(hsv[0])*2)-int(self.hue_bot.get()))])
+            diff_top=min([abs((360-(int(hsv[0])*2))-int(self.hue_top.get())),abs((int(hsv[0])*2)-int(self.hue_top.get()))])
 
-        elif self.tool_type.get() == "Pencil":
-            if self.tool_add.get():
-                color = 255
+            diffs=[diff_bot,diff_top]
+            which_bt=diffs.index(min(diffs))
+
+            if which_bt==0:
+                print("change_min")
+                diff_loop=abs((360-(int(hsv[0])*2))-int(self.hue_bot.get()))<abs((int(hsv[0])*2)-int(self.hue_bot.get()))
+                new_lower_old=int((hsv[0])*2)<int(self.hue_bot.get())
+                if invert:
+                    new_lower_old = not new_lower_old
+
+                if (not diff_loop and new_lower_old) or (diff_loop and not new_lower_old):
+                        self.hue_bot.delete(0, END)
+                        self.hue_bot.insert(0, str(hsv[0]*2))
             else:
-                color = 0
+                print("change_max")
+                diff_loop=abs((360-(int(hsv[0])*2))-int(self.hue_top.get()))<abs((int(hsv[0])*2)-int(self.hue_top.get()))
+                new_higher_old=int((hsv[0])*2)>int(self.hue_top.get())
 
-            if invert:
-                color=255-color
+                print(diff_loop)
+                print(new_higher_old)
+                if invert:
+                    new_higher_old = not new_higher_old
 
-            grey = cv2.cvtColor(self.Images[self.Current_img], cv2.COLOR_RGB2GRAY)
-            mask = np.zeros(grey.shape, dtype=np.uint8)
-            if len(self.Datas_generales[self.Current_img][self.which_tool.get()]) > 0 and np.any(self.Datas_generales[self.Current_img][self.which_tool.get()][0] != None):
-                mask = cv2.drawContours(mask, self.Datas_generales[self.Current_img][self.which_tool.get()], -1, (255), -1)
+                if (not diff_loop and new_higher_old) or (diff_loop and not new_higher_old):
+                    self.hue_top.delete(0, END)
+                    self.hue_top.insert(0, str(hsv[0]*2))
 
-            cv2.circle(mask, (int(X), int(Y)),self.tool_size, (color), -1)
-            New_cnts, _ = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-            self.Datas_generales[self.Current_img][self.which_tool.get()] = New_cnts
-            self.last_pt=event
-        self.afficher((int(X), int(Y)))
+            #Change Sat:
+            if hsv[1]<int(self.sat_bot.get()):
+                self.sat_bot.delete(0, END)
+                self.sat_bot.insert(0, str(hsv[1]))
+            elif hsv[1]>int(self.sat_top.get()):
+                self.sat_top.delete(0, END)
+                self.sat_top.insert(0, str(hsv[1]))
+
+            #Change Val:
+            if hsv[2]<int(self.val_bot.get()):
+                self.val_bot.delete(0, END)
+                self.val_bot.insert(0, str(hsv[2]))
+            elif hsv[2]>int(self.val_top.get()):
+                self.val_top.delete(0, END)
+                self.val_top.insert(0, str(hsv[2]))
+
+            self.update_show()
+
+
+
+
+
+        else:
+            if math.sqrt((X - self.Datas_generales[self.Current_img]["Scale"][0][0]) ** 2 + (Y - self.Datas_generales[self.Current_img]["Scale"][0][1]) ** 2) < 20:
+                self.pt_selected = 1
+            elif math.sqrt((X - self.Datas_generales[self.Current_img]["Scale"][1][0]) ** 2 + (Y - self.Datas_generales[self.Current_img]["Scale"][1][1]) ** 2) < 20:
+                self.pt_selected = 2
+
+            elif self.tool_type.get() == "Poly":
+                compteur = 0
+                pt_find = False
+                while not pt_find and compteur < len(self.pt_Poly):
+                    if math.sqrt(
+                            (X - self.pt_Poly[compteur][0]) ** 2 + (Y - self.pt_Poly[compteur][1]) ** 2) < 20:
+                        pt_find = True
+                        if compteur != 0 or len(self.pt_Poly) == 1:
+                            self.pt_selected = 3 + compteur
+                        if compteur == 0:
+                            self.fill_Poly(invert)
+                    compteur = compteur + 1
+
+                if not pt_find:
+                    self.pt_Poly.append([int(X), int(Y)])
+                    self.pt_selected = len(self.pt_Poly) + 3 - 1
+
+            elif self.tool_type.get() == "Pencil":
+                if self.tool_add.get():
+                    color = 255
+                else:
+                    color = 0
+
+                if invert:
+                    color=255-color
+
+                grey = cv2.cvtColor(self.Images[self.Current_img], cv2.COLOR_RGB2GRAY)
+                mask = np.zeros(grey.shape, dtype=np.uint8)
+                if len(self.Datas_generales[self.Current_img][self.which_tool.get()]) > 0 and np.any(self.Datas_generales[self.Current_img][self.which_tool.get()][0] != None):
+                    mask = cv2.drawContours(mask, self.Datas_generales[self.Current_img][self.which_tool.get()], -1, (255), -1)
+
+                cv2.circle(mask, (int(X), int(Y)),self.tool_size, (color), -1)
+                New_cnts, _ = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+                self.Datas_generales[self.Current_img][self.which_tool.get()] = New_cnts
+                self.last_pt=event
+            self.afficher((int(X), int(Y)))
 
 
     def callback_mask_R(self, event):
@@ -1171,7 +1267,7 @@ class Interface(Frame):
     def save(self, *args):
         Params=[self.hue_bot.get(), self.hue_top.get(), self.sat_bot.get(), self.sat_top.get(),self.val_bot.get(),self.val_top.get(),self.distance.get()]
         with open(self.file_project_save, 'wb') as fp:
-            pickle.dump((self.Datas_generales, self.Images_names, Params), fp)
+            pickle.dump((self.Datas_generales, self.Images_names, Params, self.param_find_targets), fp)
 
     def save_as(self):
         self.file_project_save = filedialog.asksaveasfilename(defaultextension=".rfd")
@@ -1181,7 +1277,7 @@ class Interface(Frame):
     def open_file(self):
         self.file_project_save = filedialog.askopenfilename()
         with open(self.file_project_save, 'rb') as fp:
-            self.Datas_generales, self.Images_names, Params = pickle.load(fp)
+            self.Datas_generales, self.Images_names, Params, Params_target = pickle.load(fp)
 
         self.hue_bot.delete(0, END)
         self.hue_bot.insert(0, Params[0])
@@ -1201,6 +1297,8 @@ class Interface(Frame):
         self.shown_col = [int(self.hue_bot.get()),0]
         self.shown_sat = [int(self.sat_bot.get()), 0]
         self.shown_val = [int(self.val_bot.get()), 0]
+
+        self.param_find_targets=Params_target
         self.update_show()
 
         self.distance.set(Params[6])
@@ -1251,6 +1349,31 @@ class Interface(Frame):
         self.Entry_dist.delete(0, END)
         self.Entry_dist.insert(0, "1")
         self.Current_img = 0
+
+    def remove_image(self):
+        self.Images_names.pop(self.Current_img)
+        self.Datas_generales.pop(self.Current_img)
+
+        load_frame = Loading.Loading(self.canvas_main)  # Progression bar
+        load_frame.show_load(0)
+        self.load_images(load_frame)
+        load_frame.destroy()
+
+
+    def remove_selection(self,selected_indices):
+        for i in sorted(selected_indices, reverse=True):
+            self.Images_names.pop(i)
+            self.Datas_generales.pop(i)
+
+        load_frame = Loading.Loading(self.canvas_main)  # Progression bar
+        load_frame.show_load(0)
+        self.load_images(load_frame)
+        load_frame.destroy()
+
+    def remove_images(self):
+        newWindow = Toplevel(self.root)
+        interface = Vid_list.Interface_vid_list(parent=newWindow, list_vids=self.Images_names, on_confirm=self.remove_selection)
+
 
 
     def add_images(self):

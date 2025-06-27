@@ -26,7 +26,7 @@ class Auto_param_interface(Frame):
         Grid.rowconfigure(self,0,weight=1)
         Grid.rowconfigure(self, 1, weight=1000)
         Grid.rowconfigure(self, 2, weight=1000)
-        Grid.columnconfigure(self, 0, weight=10)
+        Grid.columnconfigure(self, 0, weight=1000)
         Grid.columnconfigure(self, 1, weight=1)
 
 
@@ -46,6 +46,8 @@ class Auto_param_interface(Frame):
         self.change_img(list_vids[0], show=False)
         self.reset_back()
 
+        params=self.boss.param_find_targets
+
 
         #Parameters
         Image_param=Frame(self, background="red")
@@ -54,33 +56,33 @@ class Auto_param_interface(Frame):
 
         Label(Image_param, text="Parameters", font=("Arial", 18), background="Royalblue").grid(row=0, column=0, sticky="nsew")
         self.ero1=IntVar()
-        self.ero1.set(0)
+        self.ero1.set(params[0])
         Scale_Ero1=Scale(Image_param,variable=self.ero1, from_=0, to=50, orient=HORIZONTAL, label="Erosion 1", command=self.update_target)
         Scale_Ero1.grid(row=1, column=0, sticky="nsew")
 
         self.dil=IntVar()
-        self.dil.set(0)
+        self.dil.set(params[1])
         Scale_Dil=Scale(Image_param,variable=self.dil, from_=0, to=50, orient=HORIZONTAL, label="Dilation", command=self.update_target)
         Scale_Dil.grid(row=2, column=0, sticky="nsew")
 
         self.ero2=IntVar()
-        self.ero2.set(0)
+        self.ero2.set(params[2])
         Scale_Ero2=Scale(Image_param,variable=self.ero2, from_=0, to=50, orient=HORIZONTAL, label="Erosion 2", command=self.update_target)
         Scale_Ero2.grid(row=3, column=0, sticky="nsew")
 
 
         self.min_size=IntVar()
-        self.min_size.set(5000)
+        self.min_size.set(params[3])
         Scale_MinSize=Scale(Image_param,variable=self.min_size, from_=0, to=int((self.image_or.shape[1]*self.image_or.shape[0])/25), orient=HORIZONTAL, label="Min size", command=self.update_target)
         Scale_MinSize.grid(row=4, column=0, sticky="nsew")
 
         self.max_size=IntVar()
-        self.max_size.set(int((self.image_or.shape[1]*self.image_or.shape[0])/2))
+        self.max_size.set(params[4])
         Scale_MaxSize=Scale(Image_param,variable=self.max_size, from_=0, to=self.image_or.shape[1]*self.image_or.shape[0], orient=HORIZONTAL, label="Max size", command=self.update_target)
         Scale_MaxSize.grid(row=5, column=0, sticky="nsew")
 
         self.smooth=DoubleVar()
-        self.smooth.set(0)
+        self.smooth.set(params[5])
         Scale_smooth=Scale(Image_param,variable=self.smooth, from_=0, to=10, resolution=0.1, orient=HORIZONTAL, label="Smoothing", command=self.update_target)
         Scale_smooth.grid(row=6, column=0, sticky="nsew")
 
@@ -97,7 +99,7 @@ class Auto_param_interface(Frame):
         Button(Video_list, text="Select all", command=self.select_all).grid(row=1, column=0, columnspan=2, sticky="nsew")
 
         # Create canvas and scrollbar
-        Canvas_liste = Canvas(Video_list)
+        Canvas_liste = Canvas(Video_list, width=300)
         Canvas_liste.grid(row=2, column=0, sticky="nsew")
 
         scrollbar = Scrollbar(Video_list, orient="vertical", command=Canvas_liste.yview)
@@ -165,6 +167,9 @@ class Auto_param_interface(Frame):
             load_frame.show_load(vid/len(self.vid_buttons))
 
         load_frame.destroy()
+
+        self.boss.param_find_targets=[self.ero1.get(),self.dil.get(),self.ero2.get(),self.min_size.get(),self.max_size.get(),self.smooth.get()]
+
         self.boss.afficher_min()
         self.boss.update_show()
         self.parent.grab_release()  # Prevents interaction with other windows
@@ -288,7 +293,14 @@ class Auto_param_interface(Frame):
             if self.smooth.get() > 0.000001:
                 final_cnt = self.smooth_contour_spline(final_cnt, smoothness=self.smooth.get())
 
-            cv2.drawContours(image_to_show, [final_cnt],-1,(255,0,255),2)
+            back = image_to_show.copy()
+            cv2.drawContours(back, [final_cnt], 0, (255, 0, 255), -1)
+
+            # blend with original image
+            alpha = 0.25
+            image_to_show = cv2.addWeighted(image_to_show, 1 - alpha, back, alpha, 0)
+            cv2.drawContours(image_to_show, [final_cnt], 0, (255, 0, 255), 2)
+
 
         return(image_to_show, final_cnt)
 
