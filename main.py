@@ -19,33 +19,45 @@ from functools import partial
 import Canvas_images
 
 class Interface(Frame):
-    def __init__(self, fenetre, **kwargs):
-        Frame.__init__(self, fenetre, width=0, height=0, bd=5, **kwargs)
+    def __init__(self, window, **kwargs):
+        Frame.__init__(self, window, width=0, height=0, bd=5, **kwargs)
+        '''Main frame of the program'''
+
+        #Configuration of the layout
         self.grid()
-        self.root=fenetre
+        self.root=window
         self.root.rowconfigure(0,weight=1)
         self.root.rowconfigure(1, weight=100)
         self.root.columnconfigure(0, weight=1000)
         self.root.columnconfigure(1, weight=1)
-
         self.root.bind('<Control-s>', self.save)
 
-        #image de saturation:
+        #Creation of RGB images showing the selected colors' characterictics:
         self.saturations=display_colors.create_all_sat()
         self.values = display_colors.create_all_val()
 
-        self.which_tool = "Target"  # "Scale_R","Scale_B","Scale_Y","Fish","Red"
-        self.tool_size = 50
-        self.pt_selected = None
-        self.angle1 = 0
-        self.angle2 = 0
-        self.SizeMin = [10, 10]
-        self.Images = []
-        self.pt_Poly = []
+        ##Various variable initiation:
+
+        self.which_tool = "Target"  #What kind of tool is selected ("Target","Red","Yellow","Blue","White"), by default our tool is selcting/unselecting the main targets
+        self.tool_size = 50# Radius of the tool
+
         self.tool_type = StringVar()
         self.tool_type.set("Pencil")
         self.tool_add = IntVar()
         self.tool_add.set(1)
+
+        #Is there a point already selected (used later to move scale points and polygon points)
+        self.pt_selected = None
+
+        #The size of the Miniature display (bottom left corner, used to show all images and navigate). This is for initialisation, values are updated later
+        self.SizeMin = [10, 10]
+
+        #List of Images being part of the project
+        self.Images = []
+
+
+        self.pt_Poly = []
+
 
         Param_file = User_loading.resource_path(os.path.join("Settings"))
         with open(Param_file, 'rb') as fp:
@@ -56,7 +68,7 @@ class Interface(Frame):
         #No images yet
         self.Images_names = []
         self.project_open=False
-        self.param_find_targets=[0,0,0,5000,1000000,0]
+        self.param_find_targets=[0,0,0,5000,1000000,00, [[],[],[]]]
 
         # Canvas:
         # Barre de titre
@@ -82,7 +94,7 @@ class Interface(Frame):
         self.blank = np.zeros((500, 500, 3), np.uint8)
         self.blank.fill(255)
         self.Current_img = 0
-        self.canvas_main_img = Canvas_images.Image_show(self.canvas_main, self, self.blank)
+        self.canvas_main_img = Canvas_images.Image_show(self.canvas_main, self, self.blank, "No image")
         self.canvas_main_img.grid(row=0, column=0, sticky="nsew")
 
         self.canvas_main_but = Canvas(self.canvas_main, height=20, bd=2, highlightthickness=1, relief='ridge')
@@ -430,6 +442,7 @@ class Interface(Frame):
                 else:
                     self.Image_prec.config(state="normal")
 
+                self.canvas_main_img.name=self.Images_names[self.Current_img]
                 self.modif_image()
                 break
 
@@ -463,67 +476,69 @@ class Interface(Frame):
 
             # Echelle
             TMP_image = cv2.line(TMP_image, tuple(self.Datas_generales[image_ID]["Scale"][0]),
-                                 tuple(self.Datas_generales[image_ID]["Scale"][1]), (255, 0, 150), 3)
+                                 tuple(self.Datas_generales[image_ID]["Scale"][1]), (255, 0, 150), max([1,int(2*self.canvas_main_img.ratio)]))
             TMP_image = cv2.circle(TMP_image, tuple(self.Datas_generales[image_ID]["Scale"][0]),
-                                   10, (255, 0, 0), 2)
+                                   max([1,int(10*self.canvas_main_img.ratio)]), (255, 0, 0), max([1,int(2*self.canvas_main_img.ratio)]))
             TMP_image = cv2.circle(TMP_image, tuple(self.Datas_generales[image_ID]["Scale"][1]),
-                                   10, (255, 0, 0), 2)
+                                   max([1,int(10*self.canvas_main_img.ratio)]), (255, 0, 0), max([1,int(2*self.canvas_main_img.ratio)]))
 
             # Selection_Poly
             for pt in range(len(self.pt_Poly)):
-                TMP_image = cv2.circle(TMP_image, tuple(self.pt_Poly[pt]), 10, (0, 255, 0), -1)
+                TMP_image = cv2.circle(TMP_image, tuple(self.pt_Poly[pt]), max([1,int(10*self.canvas_main_img.ratio)]), (0, 255, 0), -1)
                 if pt > 0:
-                    TMP_image = cv2.line(TMP_image, tuple(self.pt_Poly[pt - 1]), tuple(self.pt_Poly[pt]), (0, 255, 0), 2)
+                    TMP_image = cv2.line(TMP_image, tuple(self.pt_Poly[pt - 1]), tuple(self.pt_Poly[pt]), (0, 255, 0), max([1,int(2*self.canvas_main_img.ratio)]))
 
             TMP_image = cv2.addWeighted(TMP_image, 1, overlay, opacity, 0)
 
             if self.Datas_generales[image_ID]["Target"] is not None:
-                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Target"], -1, (250, 0, 0), 4)
+                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Target"], -1, (250, 0, 0), max([1,int(2*self.canvas_main_img.ratio)]))
 
             if self.Datas_generales[image_ID]["Particles"] is not None:
                 for target in range(len(self.Datas_generales[image_ID]["Particles"])):
-                    TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Particles"][target], -1, (0, 0, 250), 2)
+                    TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Particles"][target], -1, (0, 0, 250), max([1,int(1*self.canvas_main_img.ratio)]))
 
             if len(self.Datas_generales[image_ID]["Red"]) > 0 and self.Datas_generales[image_ID]["Red"][0] is not None:
-                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Red"], -1, (150, 0, 0), 10)
+                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Red"], -1, (150, 0, 0), max([1,int(4*self.canvas_main_img.ratio)]))
 
             if len(self.Datas_generales[image_ID]["Blue"]) > 0 and self.Datas_generales[image_ID]["Blue"][0] is not None:
-                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Blue"], -1, (0, 0, 150), 10)
+                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Blue"], -1, (0, 0, 150), max([1,int(4*self.canvas_main_img.ratio)]))
 
             if len(self.Datas_generales[image_ID]["Yellow"]) > 0 and self.Datas_generales[image_ID]["Yellow"][0] is not None:
-                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Yellow"], -1, (150, 150, 2), 10)
+                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Yellow"], -1, (150, 150, 2), max([1,int(4*self.canvas_main_img.ratio)]))
 
             if len(self.Datas_generales[image_ID]["White"]) > 0 and self.Datas_generales[image_ID]["White"][0] is not None:
-                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["White"], -1, (200, 200, 200), 10)
+                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["White"], -1, (200, 200, 200), max([1,int(4*self.canvas_main_img.ratio)]))
 
             return (TMP_image)
         else:
             return(self.blank)
 
     def afficher_min(self):
+        min_width=400
         if len(self.Images) > 0:
             for ImG in range(len(self.Images)):
                 if ImG == 0:
                     TMP_min = self.transfo_img(ImG)
+                    ratio=TMP_min.shape[1]/min_width
+                    TMP_min=cv2.resize(TMP_min,[min_width,int(TMP_min.shape[0]/ratio)])
                     name = self.Images_names[ImG].split("/")[-1]
-                    TMP_min = cv2.putText(TMP_min, name, (50, TMP_min.shape[0] - 50), cv2.FONT_HERSHEY_SIMPLEX, 8,
-                                          (255, 255, 255), 35, cv2.LINE_AA)
-                    TMP_min = cv2.putText(TMP_min, name, (50, TMP_min.shape[0] - 50), cv2.FONT_HERSHEY_SIMPLEX, 8,
-                                          (0, 0, 0), 20, cv2.LINE_AA)
+                    TMP_min = cv2.putText(TMP_min, name, (10, TMP_min.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                                          (255, 255, 255), 3, cv2.LINE_AA)
+                    TMP_min = cv2.putText(TMP_min, name, (10, TMP_min.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                                          (0, 0, 0), 1, cv2.LINE_AA)
                     self.Miniature = TMP_min
                 else:
                     TMP_min = self.transfo_img(ImG)
+                    ratio=TMP_min.shape[1]/min_width
+                    TMP_min=cv2.resize(TMP_min,[min_width,int(TMP_min.shape[0]/ratio)])
                     name = self.Images_names[ImG].split("/")[-1]
-                    TMP_min = cv2.putText(TMP_min, name, (50, TMP_min.shape[0] - 50), cv2.FONT_HERSHEY_SIMPLEX, 8,
-                                          (255, 255, 255), 35, cv2.LINE_AA)
-                    TMP_min = cv2.putText(TMP_min, name, (50, TMP_min.shape[0] - 50), cv2.FONT_HERSHEY_SIMPLEX, 8,
-                                          (0, 0, 0), 20, cv2.LINE_AA)
+                    TMP_min = cv2.putText(TMP_min, name, (10, TMP_min.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                                          (255, 255, 255), 3, cv2.LINE_AA)
+                    TMP_min = cv2.putText(TMP_min, name, (10, TMP_min.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                                          (0, 0, 0), 1, cv2.LINE_AA)
                     self.Miniature = np.concatenate((self.Miniature, TMP_min), axis=0)
 
             SizeMin = self.Miniature.shape
-            self.Miniature = cv2.resize(self.Miniature,
-                                        (int(SizeMin[1] * self.ratio_min), int(SizeMin[0] * self.ratio_min)))
-
             self.cutted_Miniature = self.Miniature[self.defilement.get() - 250: self.defilement.get(), 0:SizeMin[1]]
             self.SizeMin_cut = self.cutted_Miniature.shape
 
@@ -540,7 +555,8 @@ class Interface(Frame):
         self.moved_can(pos, event,invert=True)
 
     def moved_can(self, pos, event, invert=False):
-        if not bool(event.state & 0x20000):
+        if not bool(event.state & 0x20000) and not bool(event.state & 0x1) and not bool(event.state & 0x0004):
+            print("moving")
             pos=list(pos)
             pos[0]=int(pos[0])
             pos[1] = int(pos[1])
@@ -572,7 +588,6 @@ class Interface(Frame):
                 mask = np.zeros(grey.shape, dtype=np.uint8)
                 if len(self.Datas_generales[self.Current_img][self.which_tool.get()]) > 0 and np.any(self.Datas_generales[self.Current_img][self.which_tool.get()][0] != None):
                     mask = cv2.drawContours(mask, self.Datas_generales[self.Current_img][self.which_tool.get()], -1, (255), -1)
-                print(self.last_pt)
                 cv2.line(mask, pos, self.last_pt, (color), int(self.tool_size*2))
                 New_cnts, _ = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
                 self.Datas_generales[self.Current_img][self.which_tool.get()] = New_cnts
@@ -592,7 +607,6 @@ class Interface(Frame):
         self.modif_image()
 
     def Change_add(self, type=None):
-        print("Change")
         if not isinstance(type, (bool)):
             self.tool_add.set(not self.tool_add.get())
         else:
@@ -921,25 +935,25 @@ class Interface(Frame):
         self.canvas_main_img.afficher_img(tmp_img)
 
 
-
     def pressed_can(self, pos, event, invert=False):
         X = int(pos[0])
         Y = int(pos[1])
-
-        if bool(event.state & 0x20000):#If Alt is pressed
+        if bool(event.state & 0x1):#If Alt is pressed
             rgb = np.uint8([[self.Images[self.Current_img][int(Y), int(X)]]])  # shape: (1,1,3)
             hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)[0, 0]
+            hsv=np.uint16(hsv)
 
             #Change Hue
-            diff_bot=min([abs((360-(int(hsv[0])*2))-int(self.hue_bot.get())),abs((int(hsv[0])*2)-int(self.hue_bot.get()))])
-            diff_top=min([abs((360-(int(hsv[0])*2))-int(self.hue_top.get())),abs((int(hsv[0])*2)-int(self.hue_top.get()))])
+            diff_bot=min([abs((360-(int(hsv[0])*2))+int(self.hue_bot.get())),abs((int(hsv[0])*2)-int(self.hue_bot.get()))])
+            diff_top=min([abs((360-(int(hsv[0])*2))+int(self.hue_top.get())),abs((int(hsv[0])*2)-int(self.hue_top.get()))])
+
+
 
             diffs=[diff_bot,diff_top]
             which_bt=diffs.index(min(diffs))
 
             if which_bt==0:
-                print("change_min")
-                diff_loop=abs((360-(int(hsv[0])*2))-int(self.hue_bot.get()))<abs((int(hsv[0])*2)-int(self.hue_bot.get()))
+                diff_loop=abs((360-(int(hsv[0])*2))+int(self.hue_bot.get()))<abs((int(hsv[0])*2)-int(self.hue_bot.get()))
                 new_lower_old=int((hsv[0])*2)<int(self.hue_bot.get())
                 if invert:
                     new_lower_old = not new_lower_old
@@ -948,12 +962,9 @@ class Interface(Frame):
                         self.hue_bot.delete(0, END)
                         self.hue_bot.insert(0, str(hsv[0]*2))
             else:
-                print("change_max")
-                diff_loop=abs((360-(int(hsv[0])*2))-int(self.hue_top.get()))<abs((int(hsv[0])*2)-int(self.hue_top.get()))
+                diff_loop=abs((360-(int(hsv[0])*2))+int(self.hue_top.get()))<abs((int(hsv[0])*2)-int(self.hue_top.get()))
                 new_higher_old=int((hsv[0])*2)>int(self.hue_top.get())
 
-                print(diff_loop)
-                print(new_higher_old)
                 if invert:
                     new_higher_old = not new_higher_old
 
@@ -979,11 +990,7 @@ class Interface(Frame):
 
             self.update_show()
 
-
-
-
-
-        else:
+        elif not bool(event.state & 0x20000) and not bool(event.state & 0x0004):
             if math.sqrt((X - self.Datas_generales[self.Current_img]["Scale"][0][0]) ** 2 + (Y - self.Datas_generales[self.Current_img]["Scale"][0][1]) ** 2) < 20:
                 self.pt_selected = 1
             elif math.sqrt((X - self.Datas_generales[self.Current_img]["Scale"][1][0]) ** 2 + (Y - self.Datas_generales[self.Current_img]["Scale"][1][1]) ** 2) < 20:
@@ -1024,7 +1031,7 @@ class Interface(Frame):
                 New_cnts, _ = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
                 self.Datas_generales[self.Current_img][self.which_tool.get()] = New_cnts
                 self.last_pt=[int(X), int(Y)]
-            self.modif_image(show=pos)
+            self.modif_image(show=[int(X), int(Y)])
 
 
     def right_click(self, pos, event):
@@ -1050,7 +1057,7 @@ class Interface(Frame):
 
         self.pt_Poly = []
         self.pt_selected = None
-        self.modif_image()
+        self.modif_image([X,Y])
 
     def press_fenetre(self, event):
         self.press_position = pyautogui.position()
@@ -1079,7 +1086,7 @@ class Interface(Frame):
         file_to_save = filedialog.asksaveasfilename(defaultextension=".csv")
         with open(file_to_save, 'w', newline='') as csv_file:
             writer = csv.writer(csv_file, delimiter=";")
-            Names = ["File", "Type", "Fish_ID", "ID", "Area", "Mean_Hue", "Mean_Saturation", "Mean_Value"]
+            Names = ["File", "Type", "Targetr", "ID", "Area", "Mean_Hue", "Mean_Saturation", "Mean_Value"]
             writer.writerow(Names)
 
             for i in range(len(self.Datas_generales)):
@@ -1152,6 +1159,7 @@ class Interface(Frame):
                 self.Image_prec.config(state="disabled")
             else:
                 self.Image_prec.config(state="normal")
+            self.canvas_main_img.name = self.Images_names[self.Current_img]
             self.modif_image()
 
     def precedant(self):
@@ -1165,6 +1173,7 @@ class Interface(Frame):
                 self.Image_prec.config(state="disabled")
             else:
                 self.Image_prec.config(state="normal")
+            self.canvas_main_img.name = self.Images_names[self.Current_img]
             self.modif_image()
 
     def affiche_mouse(self, pos):
@@ -1175,6 +1184,7 @@ class Interface(Frame):
 
                 rgb = np.uint8([[self.Images[self.Current_img][Y,X]]])  # shape: (1,1,3)
                 hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)[0,0]
+                hsv = np.uint16(hsv)
 
                 self.position_mouse_x.set("X="+str(X))
                 self.position_mouse_y.set("Y=" + str(Y))
@@ -1229,7 +1239,12 @@ class Interface(Frame):
         self.load_images(load_frame)
         load_frame.destroy()
 
-        self.canvas_main_img.update_image(self.Images[self.Current_img])
+        if len(self.Images_names)>0:
+            self.canvas_main_img.name=self.Images_names[self.Current_img]
+            self.canvas_main_img.update_image(self.Images[self.Current_img])
+        else:
+            self.canvas_main_img.name="No image"
+            self.canvas_main_img.update_image(self.blank)
         self.afficher_min()
         self.update()
         self.prepare_GUI_with_proj()
@@ -1315,10 +1330,10 @@ class Interface(Frame):
             Actual_fish_cnt = []
             pt1, pt2 = [[25,50],[100,50]]
             Actual_particles = []
-            Actual_yellow_scale = Fun.color_calib(ImG, "yellow")
-            Actual_blue_scale = Fun.color_calib(ImG, "blue")
-            Actual_red_scale = Fun.color_calib(ImG, "red")
-            Actual_white_scale = Fun.color_calib(ImG, "white")
+            Actual_yellow_scale = []
+            Actual_blue_scale = []
+            Actual_red_scale = []
+            Actual_white_scale = []
             self.Datas_generales.append(
                 {"Target": Actual_fish_cnt, "Particles": Actual_particles, "Scale": [pt1, pt2],
                  "Yellow": Actual_yellow_scale, "Blue": Actual_blue_scale,
@@ -1349,23 +1364,22 @@ class Interface(Frame):
                 ImG = cv2.cvtColor(ImG, cv2.COLOR_BGR2RGB)
                 self.Images.append(ImG)
 
+                min_width=400
+
                 if first:
                     ImG = self.transfo_img(compteur)
+                    ratio=ImG.shape[1]/min_width
+                    ImG=cv2.resize(ImG,[min_width,int(ImG.shape[0]/ratio)])
                     self.Miniature = ImG
                     first = False
                 else:
                     ImG = self.transfo_img(compteur)
+                    ratio=ImG.shape[1]/min_width
+                    ImG=cv2.resize(ImG,[min_width,int(ImG.shape[0]/ratio)])
                     self.Miniature = np.concatenate((self.Miniature, ImG), axis=0)
                 count+=1
 
-                print(count)
-
-            SizeMin = self.Miniature.shape
-            self.ratio_min = 400 / SizeMin[1]
-
             self.Current_img = 0
-            self.Miniature = cv2.resize(self.Miniature,
-                                        (int(SizeMin[1] * self.ratio_min), int(SizeMin[0] * self.ratio_min)))
             self.SizeMin = self.Miniature.shape
             self.cutted_Miniature = self.Miniature[0:250, 0:self.SizeMin[1]]
             self.SizeMin_cut = self.cutted_Miniature.shape

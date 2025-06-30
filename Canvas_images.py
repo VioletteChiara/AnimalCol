@@ -17,13 +17,14 @@ class Image_show(Frame):
     containers (higher level classes) through bindings on the image canvas.
     """
 
-    def __init__(self, parent, boss, img, **kwargs):
+    def __init__(self, parent, boss, img, name, **kwargs):
         Frame.__init__(self, parent, bd=5, **kwargs)
         self.config(borderwidth=0, highlightthickness=0, background="blue")
         self.img=img
         self.last_img=self.img
         self.boss=boss
         self.no_zoom=False
+        self.name=name
 
         self.canvas_video = Canvas(self, highlightthickness=0, borderwidth=0, background="pink")
         self.canvas_video.grid(row=0, column=0, sticky="nsew")
@@ -40,13 +41,12 @@ class Image_show(Frame):
         self.ratio = 1#How much do we zoom in
         self.ZinSQ = [-1, ["NA", "NA"]]#used to zoom in a particular area
 
-
         self.bindings()
+
 
     def update_ratio(self, *args):
         '''Calculate the ratio between the original size of the video and the displayed image'''
         self.ratio=max((self.zoom_sq[2]-self.zoom_sq[0])/self.canvas_video.winfo_width(),(self.zoom_sq[3]-self.zoom_sq[1])/self.canvas_video.winfo_height())
-
 
 
     def update_image(self, img):
@@ -143,7 +143,8 @@ class Image_show(Frame):
         self.canvas_video.bind("<Control-B1-Motion>", self.Sq_Zoom_mov)
         self.canvas_video.bind("<Control-B1-ButtonRelease>", lambda x: self.Zoom(event=x,Zin=True))
         self.canvas_video.bind("<Control-B3-ButtonRelease>", lambda x: self.Zoom(event=x,Zin=False))
-        self.canvas_video.bind("<Configure>", lambda x: self.afficher_img(self.last_img))
+        self.canvas_video.bind("<Configure>", lambda x: self.boss.modif_image())
+        self.boss.root.bind("<Map>", lambda x: self.afficher_img(self.last_img))
         # Visualisation de la video
         self.canvas_video.bind("<space>", self.boss.Change_add)
 
@@ -267,6 +268,12 @@ class Image_show(Frame):
         self.shape= TMP_image_to_show2.shape
 
         img2=TMP_image_to_show2
+
+        img2 = cv2.putText(img2, os.path.basename(self.name), (10, img2.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                              (255, 255, 255), 3, cv2.LINE_AA)
+        img2 = cv2.putText(img2, os.path.basename(self.name), (10, img2.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                              (0, 0, 0), 1, cv2.LINE_AA)
+
         self.image_to_show3 = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(img2))
         self.can_import = self.canvas_video.create_image((self.canvas_video.winfo_width()-self.shape[1])/2, (self.canvas_video.winfo_height()-self.shape[0])/2, image=self.image_to_show3, anchor=NW)
         self.canvas_video.config(height=self.shape[1],width=self.shape[0])
