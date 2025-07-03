@@ -1,75 +1,26 @@
 import cv2
 import numpy as np
-from scipy.interpolate import splprep, splev
 
+def find_particles(image,target,hue,sat,val):
+    if not target is None:
+        image_grey = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+        target_mask = np.zeros_like(image_grey)
 
-def find_target(image):
-    source_img_grey = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-    ret, Binary_image = cv2.threshold(source_img_grey, 50, 255, cv2.THRESH_BINARY)
-    kernel = np.ones((7, 7), np.uint8)
-    Binary_image = cv2.erode(Binary_image, kernel, iterations=3)
-    Binary_image = cv2.dilate(Binary_image, kernel, iterations=7)
-    Binary_image = cv2.erode(Binary_image, kernel, iterations=2)
+        cv2.drawContours(target_mask, [target], -1, 255, -1)
+        img_hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
 
-    contours, _ = cv2.findContours(Binary_image, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-
-    filtered_contours = []
-    for cnt in contours:
-        area = cv2.contourArea(cnt)
-        M = cv2.moments(cnt)
-        cX = int(M["m10"] / M["m00"])
-        cY = int(M["m01"] / M["m00"])
-        if cX > 730 and cX < 3500 and cY > 900 and cY < 2300:
-            if area > 50000 and area < 1000000:
-                filtered_contours.append(cnt)
-
-    smoothened=[]
-    for cnt in filtered_contours:
-        x, y = cnt.T
-        # Convert from numpy arrays to normal arrays
-        x = x.tolist()[0]
-        y = y.tolist()[0]
-        # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splprep.html
-        tck, u = splprep([x, y], k=3, u=None, s=1.0, per=1)
-        # https://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.linspace.html
-        u_new = np.linspace(u.min(), u.max(), 50)
-        # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
-        x_new, y_new = splev(u_new, tck, der=0)
-        # Convert it back to numpy format for opencv to be able to display it
-        res_array = [[[int(i[0]), int(i[1])]] for i in zip(x_new, y_new)]
-        smoothened.append(np.asarray(res_array, dtype=np.int32))
-    return(smoothened)
-
-def find_red(image,fish,hue,sat,intensity):
-    print("Find red")
-    image_grey=cv2.cvtColor(image,cv2.COLOR_RGB2GRAY)
-    cimg = np.zeros_like(image_grey)
-
-    cv2.drawContours(cimg, [fish], -1, 255, -1)
-    pts = np.where(cimg == 255)
-
-    img_hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-    list_intensities = []
-    list_intensities.append(img_hsv[pts[0], pts[1]])
-
-    img_empty = np.zeros(image_grey.shape, dtype=np.uint8)
-
-    compteur_red = 0
-
-    for inten in range(len(list_intensities[0])):
-        if hue[0]>hue[1]:
-            if (list_intensities[0][inten][0] <= hue[1] or list_intensities[0][inten][0] >= hue[0]) and list_intensities[0][inten][1] >= sat[0] and list_intensities[0][inten][1] <= sat[1] and list_intensities[0][inten][2] >= intensity[0] and list_intensities[0][inten][2] <= intensity[1]:
-                compteur_red = compteur_red + 1
-                img_empty[pts[0][inten], pts[1][inten]] = 255
-
+        if hue[0] < hue[1]:
+            mask=cv2.inRange(img_hsv,np.array([hue[0],sat[0],val[0]]),np.array([hue[1],sat[1],val[1]]))
         else:
-            if (list_intensities[0][inten][0] >= hue[0] and list_intensities[0][inten][0] <= hue[1]) and list_intensities[0][inten][1] >= sat[0] and list_intensities[0][inten][1] <= sat[1] and list_intensities[0][inten][2] >= intensity[0] and list_intensities[0][inten][2] <= intensity[1]:
-                compteur_red = compteur_red + 1
-                img_empty[pts[0][inten], pts[1][inten]] = 255
+            mask_low = cv2.inRange(img_hsv, np.array([hue[0], sat[0], val[0]]), np.array([180, sat[1], val[1]]))
+            mask_high = cv2.inRange(img_hsv, np.array([0, sat[0], val[0]]), np.array([hue[1], sat[1], val[1]]))
+            mask = cv2.bitwise_or(mask_low, mask_high)
 
-    cnts2, _ = cv2.findContours(img_empty, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+        final_mask=cv2.bitwise_and(mask, target_mask)
 
-    return(cnts2)
+        cnts2, _ = cv2.findContours(final_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+        return(cnts2)
+
 
 def find_scale(image,hue,sat,intensity):
     hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)

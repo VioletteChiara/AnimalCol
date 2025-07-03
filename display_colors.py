@@ -29,7 +29,6 @@ def create_hue(hb, ht):
     if ht<0:
         ht=360-ht
 
-
     if hb>ht:
         hue_range_high = np.arange(int(hb / 2), 179 + 1, dtype=np.uint8)  # X-axis (width)
         hue_range_low = np.arange(0, int(ht / 2) + 1, dtype=np.uint8)  # X-axis (width)

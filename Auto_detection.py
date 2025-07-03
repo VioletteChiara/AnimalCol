@@ -1,5 +1,5 @@
 from os import stat_result
-from statistics import quantiles
+from scipy.stats.contingency import crosstab
 from tkinter import *
 import PIL
 import PIL.ImageTk, PIL.Image
@@ -9,7 +9,6 @@ import math
 from scipy.interpolate import splprep, splev
 import os
 
-from scipy.sparse import vstack
 
 import Loading
 
@@ -17,6 +16,9 @@ class Auto_param_interface(Frame):
     """ This is a small Frame in which the user can define the nomber of targets per arena, in the case the number is variable between arenas."""
     def __init__(self, parent, list_vids, boss, curr_vid, **kwargs):
         Frame.__init__(self, parent, bd=5, **kwargs)
+
+        self.percentile_bot=0.5
+        self.percentile_top = 99.5
 
         parent.grid_rowconfigure(0, weight=1)
         parent.grid_columnconfigure(0, weight=1)
@@ -52,7 +54,7 @@ class Auto_param_interface(Frame):
         self.Image_can.bind("<Button-1>", self.callback)
 
         self.change_img(list_vids[0], show=False)
-        self.all_Hs=self.boss.param_find_targets[6][0]
+        self.all_Hs = self.boss.param_find_targets[6][0]
         self.all_Ss = self.boss.param_find_targets[6][1]
         self.all_Vs = self.boss.param_find_targets[6][2]
 
@@ -140,7 +142,7 @@ class Auto_param_interface(Frame):
             chk.grid(row=pos_row, column=0, sticky="w")
 
         self.vid_buttons[curr_vid].set(True)
-        self.parent.bind("<Configure>", self.change_size)
+
 
         Button(Video_list, text="Validate", font=("Arial", 18), background="green", command=self.validate).grid(row=3, column=0, columnspan=2, sticky="nsew")
 
@@ -149,70 +151,78 @@ class Auto_param_interface(Frame):
         def on_frame_configure(event):
             Canvas_liste.configure(scrollregion=Canvas_liste.bbox("all"))
 
-        checkbutton_frame.bind("<Configure>", on_frame_configure)
-
         # Optional: Make canvas expand with window resize
         def on_canvas_configure(event):
             # Update the inner frame's width to fill canvas
             canvas_width = event.width
             Canvas_liste.itemconfig(canvas_window, width=canvas_width)
 
-        Canvas_liste.bind("<Configure>", on_canvas_configure)
-
         self.after(200, lambda: (
             self.change_img(self.holder.get()),
             self.update_img()
         ))
 
+        self.parent.bind("<Configure>", self.change_size)
+        checkbutton_frame.bind("<Configure>", on_frame_configure)
+        Canvas_liste.bind("<Configure>", on_canvas_configure)
+        self.update()
+
 
     def change_size(self, *args):
-        print("Change size")
-        self.update_target()
+        self.update_img()
 
     def show_col(self):
-        try:
-            if len(self.all_Hs)>0:
-                empty=np.zeros([100,100,3], np.uint8)
-                empty[:,:,0]=np.mean([int(np.percentile(self.all_Hs,1)),int(np.percentile(self.all_Hs,99))])
-
-                min_S=int(np.percentile(self.all_Ss,1))
-                max_S=int(np.percentile(self.all_Ss,99))
-                values = np.uint8(np.linspace(min_S, max_S, 100))  # 100 values from min_V to max_V
-                empty[:, 0:99, 1] = np.tile(values[:, np.newaxis], (1, 99))  # Repeat across columns
-
-                min_V=int(np.percentile(self.all_Vs,1))
-                max_V=int(np.percentile(self.all_Vs,99))
-                values = np.uint8(np.linspace(min_V, max_V, 100))  # 100 values from min_V to max_V
-                empty[:, 0:99, 2] = np.tile(values[:, np.newaxis], (1, 99))  # Repeat across columns
-
-                vertical_col_band = np.zeros([10, 100, 3], np.uint8)
-                vertical_col_band[:, :, 1] = int(
-                    np.mean([int(np.percentile(self.all_Ss, 1)), int(np.percentile(self.all_Ss, 99))]))
-                vertical_col_band[:, :, 2] = int(
-                    np.mean([int(np.percentile(self.all_Vs, 1)), int(np.percentile(self.all_Vs, 99))]))
-
-                min_H = int(np.percentile(self.all_Hs, 1))
-                max_H = int(np.percentile(self.all_Hs, 99))
-                values = np.uint8(np.linspace(min_H, max_H, 100))  # 100 values from min_H to max_H
-
-                # Fill horizontal hue gradient across 100 columns
-                vertical_col_band[:, :, 0] = np.tile(values, (10, 1))  # Repeat the gradient row-wise
-                empty = np.vstack([empty, vertical_col_band])
-                empty=cv2.cvtColor(empty, cv2.COLOR_HSV2RGB)
-
+        if len(self.all_Hs)>0:
+            empty=np.zeros([100,100,3], np.uint8)
+            
+            split_range, ranges_hue, _ = self.boss.find_hue_range(self.all_Hs.copy(), self.percentile_bot, self.percentile_top)
+            if not split_range:
+                mean=np.mean([ranges_hue[0],ranges_hue[1]])
             else:
-                empty = np.zeros([110, 100, 3], np.uint8)
-                empty[:, :] = [255, 0, 0]  # HSV or BGR depending on context
+                mean=ranges_hue[0]+((180-ranges_hue[0])+ranges_hue[1])/2
+                if mean>180:
+                    mean=mean-180
 
-            self.back_col = cv2.resize(empty, (int(self.Canvas_back_col.winfo_width()), int(self.Canvas_back_col.winfo_height())))
-            self.back_col2 = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.back_col))
-            self.Canvas_back_col.create_image(0, 0, image=self.back_col2, anchor=NW)
-            self.Canvas_back_col.update()
-            self.update()
+            empty[:, :, 0] = mean
 
-        except:
-            pass
+            min_S=int(np.percentile(self.all_Ss,self.percentile_bot))
+            max_S=int(np.percentile(self.all_Ss,self.percentile_top))
+            values = np.uint8(np.linspace(min_S, max_S, 100))  # 100 values from min_V to max_V
+            empty[:, 0:99, 1] = np.tile(values[:, np.newaxis], (1, 99))  # Repeat across columns
 
+            min_V=int(np.percentile(self.all_Vs,self.percentile_bot))
+            max_V=int(np.percentile(self.all_Vs,self.percentile_top))
+            values = np.uint8(np.linspace(min_V, max_V, 100))  # 100 values from min_V to max_V
+            empty[:, 0:99, 2] = np.tile(values[:, np.newaxis], (1, 99))  # Repeat across columns
+
+            vertical_col_band = np.zeros([10, 100, 3], np.uint8)
+            vertical_col_band[:, :, 1] = int(
+                np.mean([int(np.percentile(self.all_Ss, self.percentile_bot)), int(np.percentile(self.all_Ss, self.percentile_top))]))
+            vertical_col_band[:, :, 2] = int(
+                np.mean([int(np.percentile(self.all_Vs, self.percentile_bot)), int(np.percentile(self.all_Vs, self.percentile_top))]))
+
+            if not split_range:
+                values = np.uint8(np.linspace(ranges_hue[0], ranges_hue[1], 100))  # 100 values from min_H to max_H
+            else:
+                prop1 = (180 - ranges_hue[0]) / ((180 - ranges_hue[0]) + ranges_hue[1])
+                line1 = np.linspace(ranges_hue[0], 180, round(100 * prop1))
+                line2 = np.linspace(0, ranges_hue[1], 100 - round(100 * prop1))
+                values = np.concatenate([line1, line2])
+
+            # Fill horizontal hue gradient across 100 columns
+            vertical_col_band[:, :, 0] = np.tile(values, (10, 1))  # Repeat the gradient row-wise
+            empty = np.vstack([empty, vertical_col_band])
+            empty=cv2.cvtColor(empty, cv2.COLOR_HSV2RGB)
+
+        else:
+            empty = np.zeros([110, 100, 3], np.uint8)
+            empty[:, :] = [255, 0, 0]  # HSV or BGR depending on context
+
+        self.back_col = cv2.resize(empty, (int(self.Canvas_back_col.winfo_width()), int(self.Canvas_back_col.winfo_height())))
+        self.back_col2 = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.back_col))
+        self.Canvas_back_col.create_image(0, 0, image=self.back_col2, anchor=NW)
+        self.Canvas_back_col.update()
+        self.update()
 
 
     def select_all(self):
@@ -256,7 +266,7 @@ class Auto_param_interface(Frame):
 
     def change_img(self, im_name, show=True):
         self.image_or=cv2.imread(im_name)
-        self.hsv=cv2.cvtColor(self.image_or,cv2.COLOR_RGB2HSV)
+        self.hsv=cv2.cvtColor(self.image_or,cv2.COLOR_BGR2HSV)
         self.image_to_show=self.image_or.copy()
         if show:
             self.update_target()
@@ -280,20 +290,20 @@ class Auto_param_interface(Frame):
         ratio_h=img.shape[0]/canvas_height
         self.scale_ratio= max(ratio_w,ratio_h)
 
+        if int(img.shape[1]/self.scale_ratio)>1 and int(img.shape[0]/self.scale_ratio)>1:
+            # Step 3: Resize image to fit canvas
+            img = cv2.resize(img, (int(img.shape[1]/self.scale_ratio), int(img.shape[0]/self.scale_ratio)), interpolation=cv2.INTER_AREA)
 
-        # Step 3: Resize image to fit canvas
-        img = cv2.resize(img, (int(img.shape[1]/self.scale_ratio), int(img.shape[0]/self.scale_ratio)), interpolation=cv2.INTER_AREA)
+            # Step 4: Convert BGR (OpenCV) to RGB (PIL)
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            pil_image = PIL.Image.fromarray(img_rgb)
+            tk_image = PIL.ImageTk.PhotoImage(image=pil_image)
 
-        # Step 4: Convert BGR (OpenCV) to RGB (PIL)
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        pil_image = PIL.Image.fromarray(img_rgb)
-        tk_image = PIL.ImageTk.PhotoImage(image=pil_image)
+            # Step 5: Display the image on the canvas
+            self.Image_can.image = tk_image  # Keep a reference to avoid garbage collection
+            self.Image_can.create_image(0, 0, image=tk_image, anchor=NW)
 
-        # Step 5: Display the image on the canvas
-        self.Image_can.image = tk_image  # Keep a reference to avoid garbage collection
-        self.Image_can.create_image(0, 0, image=tk_image, anchor=NW)
-
-        self.show_col()
+            self.show_col()
 
 
     def smooth_contour_spline(self, contour, smoothness=5.0, num_points=100, closed=True):
@@ -317,17 +327,32 @@ class Auto_param_interface(Frame):
             print(f"Spline smoothing failed: {e}")
             return contour
 
+
     def find_target(self, event=None, img=None):
         final_cnt=None
         if len(self.all_Hs)>0:
-            lowers = np.array([np.percentile(self.all_Hs,1),np.percentile(self.all_Ss,1),np.percentile(self.all_Vs,1)], dtype=np.uint8)
-            uppers = np.array([np.percentile(self.all_Hs,99),np.percentile(self.all_Ss,99),np.percentile(self.all_Vs,99)], dtype=np.uint8)
-
-            if img is None:
-                Binary_image = cv2.inRange(self.hsv, lowers, uppers)
+            if not img is None:
+                img=cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
             else:
-                img=cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+                img=self.hsv.copy()
+
+            split_range, ranges_hue, _ = self.boss.find_hue_range(self.all_Hs.copy(),self.percentile_bot,self.percentile_top)
+
+            if not split_range:
+                lowers = np.array([ranges_hue[0],np.percentile(self.all_Ss,self.percentile_bot),np.percentile(self.all_Vs,self.percentile_bot)], dtype=np.uint8)
+                uppers = np.array([ranges_hue[1],np.percentile(self.all_Ss,self.percentile_top),np.percentile(self.all_Vs,self.percentile_top)], dtype=np.uint8)
                 Binary_image = cv2.inRange(img, lowers, uppers)
+            else:
+                lowers = np.array([ranges_hue[0],np.percentile(self.all_Ss,self.percentile_bot),np.percentile(self.all_Vs,self.percentile_bot)], dtype=np.uint8)
+                uppers = np.array([180,np.percentile(self.all_Ss,self.percentile_top),np.percentile(self.all_Vs,self.percentile_top)], dtype=np.uint8)
+                Binary_image1 = cv2.inRange(img, lowers, uppers)
+                lowers = np.array([0,np.percentile(self.all_Ss,self.percentile_bot),np.percentile(self.all_Vs,self.percentile_bot)], dtype=np.uint8)
+                uppers = np.array([ranges_hue[1],np.percentile(self.all_Ss,self.percentile_top),np.percentile(self.all_Vs,self.percentile_top)], dtype=np.uint8)
+                Binary_image2 = cv2.inRange(img, lowers, uppers)
+
+                Binary_image=cv2.bitwise_or(Binary_image1,Binary_image2)
+
+
             Binary_image = cv2.bitwise_not(Binary_image)
 
             kernel = np.ones((3,3), np.uint8)
@@ -344,7 +369,6 @@ class Auto_param_interface(Frame):
         new_cnts=[]
         dist_to_center=[]
         for cnt in cnts:
-
             surf=cv2.contourArea(cnt)
             if surf>self.min_size.get() and surf<self.max_size.get():
 
@@ -366,13 +390,14 @@ class Auto_param_interface(Frame):
                 final_cnt = self.smooth_contour_spline(final_cnt, smoothness=self.smooth.get())
 
             back = image_to_show.copy()
+            cv2.drawContours(back, cnts, -1, (0, 0, 255), -1)
             cv2.drawContours(back, [final_cnt], 0, (255, 0, 255), -1)
+
 
             # blend with original image
             alpha = 0.25
             image_to_show = cv2.addWeighted(image_to_show, 1 - alpha, back, alpha, 0)
             cv2.drawContours(image_to_show, [final_cnt], 0, (255, 0, 255), 2)
-
 
         return(image_to_show, final_cnt)
 
