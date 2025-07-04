@@ -515,7 +515,8 @@ class Interface(Frame):
         if len(self.Images)>0:
             overlay = np.zeros(self.Images[image_ID].shape, dtype=np.uint8)
             for target in range(len(self.Datas_generales[image_ID]["Particles"])):
-                overlay = cv2.drawContours(overlay, self.Datas_generales[image_ID]["Particles"][target][0], -1, (0, 0, 255), -1)
+                if len(self.Datas_generales[image_ID]["Particles"][target])>0:
+                    overlay = cv2.drawContours(overlay, self.Datas_generales[image_ID]["Particles"][target][0], -1, (0, 0, 255), -1)
             opacity = 0.75
 
             TMP_image = np.copy(self.Images[image_ID])
@@ -541,7 +542,8 @@ class Interface(Frame):
 
             if self.Datas_generales[image_ID]["Particles"] is not None:
                 for target in range(len(self.Datas_generales[image_ID]["Particles"])):
-                    TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Particles"][target][0], -1, (0, 0, 250), max([1,int(1*self.canvas_main_img.ratio)]))
+                    if len(self.Datas_generales[image_ID]["Particles"][target]) > 0:
+                        TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Particles"][target][0], -1, (0, 0, 250), max([1,int(1*self.canvas_main_img.ratio)]))
 
             if len(self.Datas_generales[image_ID]["Red"]) > 0 and self.Datas_generales[image_ID]["Red"][0] is not None:
                 TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Red"][0], -1, (150, 0, 0), max([1,int(4*self.canvas_main_img.ratio)]))

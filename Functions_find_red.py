@@ -6,6 +6,9 @@ def find_particles(image,contours,target,hue,sat,val):
         image_grey = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         target_mask = np.zeros_like(image_grey)
 
+        print(contours[0])
+        print(contours[1])
+
         cv2.drawContours(target_mask, contours[0], target, 255, -1, hierarchy=contours[1])
         img_hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
 
