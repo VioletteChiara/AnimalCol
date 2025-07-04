@@ -1,4 +1,3 @@
-import time
 from tkinter import *
 from tkinter import filedialog
 import numpy as np
@@ -6,6 +5,7 @@ import cv2
 import PIL.Image, PIL.ImageTk
 import math
 import csv
+import Extracting_particles
 import Functions_find_red as Fun
 import os
 import pickle
@@ -104,10 +104,10 @@ class Interface(Frame):
         self.menubar.entryconfig("Images", state="disabled")
         # Options linked to the particles/targets to be detected
         self.particlesmenu = Menu(self.menubar, tearoff=0)
-        self.menubar.add_cascade(label="Particles detection", menu=self.particlesmenu)
+        self.menubar.add_cascade(label="Detection", menu=self.particlesmenu)
         self.particlesmenu.add_command(label="Automatic target detection", command=self.automated_findings)
         self.particlesmenu.add_command(label="Export particles", command=self.save_particles)
-        self.menubar.entryconfig("Particles detection", state="disabled")
+        self.menubar.entryconfig("Detection", state="disabled")
         #The auto-update may be on of off. If on, the particles will be calculated each time there is a modification of the parameters/drawings
         #If off, users will have to click the "Validate" button, which will limit the risks of having slow rendering
         if self.auto_update:
@@ -227,7 +227,7 @@ class Interface(Frame):
         #Canvas for Hue
         self.canvas_img_couleurs = Canvas(Color_selection, bd=0, highlightthickness=0, relief='flat', background="purple")
         self.canvas_img_couleurs.grid(row=2, column=0, sticky="ns")
-        self.img_colors = cv2.imread("Colors.png")#We load a representation of the hue values
+        self.img_colors = cv2.imread(User_loading.resource_path(os.path.join("Colors.png")))#We load a representation of the hue values
         Size = self.img_colors.shape
         self.ratio_col = 0.35 #To resize properly the image
         self.img_colors_new = cv2.cvtColor(self.img_colors, cv2.COLOR_BGR2RGB)
@@ -514,8 +514,8 @@ class Interface(Frame):
     def transfo_img(self, image_ID):
         if len(self.Images)>0:
             overlay = np.zeros(self.Images[image_ID].shape, dtype=np.uint8)
-            for particle in range(len(self.Datas_generales[image_ID]["Particles"])):
-                overlay = cv2.drawContours(overlay, self.Datas_generales[image_ID]["Particles"][particle], -1, (0, 0, 255), -1)
+            for target in range(len(self.Datas_generales[image_ID]["Particles"])):
+                overlay = cv2.drawContours(overlay, self.Datas_generales[image_ID]["Particles"][target][0], -1, (0, 0, 255), -1)
             opacity = 0.75
 
             TMP_image = np.copy(self.Images[image_ID])
@@ -536,24 +536,24 @@ class Interface(Frame):
 
             TMP_image = cv2.addWeighted(TMP_image, 1, overlay, opacity, 0)
 
-            if self.Datas_generales[image_ID]["Target"] is not None:
-                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Target"], -1, (250, 0, 0), max([1,int(2*self.canvas_main_img.ratio)]))
+            if self.Datas_generales[image_ID]["Target"][0] is not None:
+                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Target"][0], -1, (250, 0, 0), max([1,int(2*self.canvas_main_img.ratio)]))
 
             if self.Datas_generales[image_ID]["Particles"] is not None:
                 for target in range(len(self.Datas_generales[image_ID]["Particles"])):
-                    TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Particles"][target], -1, (0, 0, 250), max([1,int(1*self.canvas_main_img.ratio)]))
+                    TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Particles"][target][0], -1, (0, 0, 250), max([1,int(1*self.canvas_main_img.ratio)]))
 
             if len(self.Datas_generales[image_ID]["Red"]) > 0 and self.Datas_generales[image_ID]["Red"][0] is not None:
-                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Red"], -1, (150, 0, 0), max([1,int(4*self.canvas_main_img.ratio)]))
+                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Red"][0], -1, (150, 0, 0), max([1,int(4*self.canvas_main_img.ratio)]))
 
             if len(self.Datas_generales[image_ID]["Blue"]) > 0 and self.Datas_generales[image_ID]["Blue"][0] is not None:
-                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Blue"], -1, (0, 0, 150), max([1,int(4*self.canvas_main_img.ratio)]))
+                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Blue"][0], -1, (0, 0, 150), max([1,int(4*self.canvas_main_img.ratio)]))
 
             if len(self.Datas_generales[image_ID]["Yellow"]) > 0 and self.Datas_generales[image_ID]["Yellow"][0] is not None:
-                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Yellow"], -1, (150, 150, 2), max([1,int(4*self.canvas_main_img.ratio)]))
+                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Yellow"][0], -1, (150, 150, 2), max([1,int(4*self.canvas_main_img.ratio)]))
 
             if len(self.Datas_generales[image_ID]["White"]) > 0 and self.Datas_generales[image_ID]["White"][0] is not None:
-                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["White"], -1, (200, 200, 200), max([1,int(4*self.canvas_main_img.ratio)]))
+                TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["White"][0], -1, (200, 200, 200), max([1,int(4*self.canvas_main_img.ratio)]))
 
             return (TMP_image)
         else:
@@ -632,9 +632,9 @@ class Interface(Frame):
                 grey = cv2.cvtColor(self.Images[self.Current_img], cv2.COLOR_RGB2GRAY)
                 mask = np.zeros(grey.shape, dtype=np.uint8)
                 if len(self.Datas_generales[self.Current_img][self.which_tool.get()]) > 0 and np.any(self.Datas_generales[self.Current_img][self.which_tool.get()][0] != None):
-                    mask = cv2.drawContours(mask, self.Datas_generales[self.Current_img][self.which_tool.get()], -1, (255), -1)
+                    mask = cv2.drawContours(mask, self.Datas_generales[self.Current_img][self.which_tool.get()][0], -1, (255), -1)
                 cv2.line(mask, pos, self.last_pt, (color), int(self.tool_size*2))
-                New_cnts, _ = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+                New_cnts = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
                 self.Datas_generales[self.Current_img][self.which_tool.get()] = New_cnts
 
             self.last_pt=pos
@@ -660,9 +660,10 @@ class Interface(Frame):
     def validate(self):
         if len(self.Images) > 0:
             self.Datas_generales[self.Current_img]["Particles"]=[]
-            for fish in range(len(self.Datas_generales[self.Current_img]["Target"])):
-                self.Datas_generales[self.Current_img]["Particles"].append(Fun.find_particles(self.Images[self.Current_img],
-                                                                         self.Datas_generales[self.Current_img]["Target"][fish], (
+            for target in range(len(self.Datas_generales[self.Current_img]["Target"][0])):
+                if self.Datas_generales[self.Current_img]["Target"][1][0][target][3] == -1:
+                    self.Datas_generales[self.Current_img]["Particles"].append(Fun.find_particles(self.Images[self.Current_img],
+                                                                         self.Datas_generales[self.Current_img]["Target"],target, (
                                                                          int(float(self.hue_bot.get()) / 2),
                                                                          int(float(self.hue_top.get()) / 2)), (
                                                                          (int(float(self.sat_bot.get()))),
@@ -685,7 +686,7 @@ class Interface(Frame):
                 self.shown_col=[int(self.hue_bot.get()),0]
 
         self.img_colors_new = np.copy(self.img_colors)
-        self.img_colors_new_r = cv2.resize(self.img_colors_new, (int(Size[1] * 0.5), int(Size[0] * 0.5)))
+        self.img_colors_new_r = cv2.resize(self.img_colors_new, (int(Size[1] * self.ratio_col), int(Size[0] * self.ratio_col)))
         self.img_colors_new_r = cv2.cvtColor(self.img_colors_new_r,cv2.COLOR_RGB2BGR)
 
 
@@ -729,7 +730,7 @@ class Interface(Frame):
         saturations=self.saturations.copy()
         self.sat3=cv2.line(saturations, (0,int(self.sat_bot.get())),(int(self.canvas_img_sat.winfo_width()),int(self.sat_bot.get())),(200,200,200),2)
         self.sat3 = cv2.line(saturations, (0, int(self.sat_top.get())),(int(self.canvas_img_sat.winfo_width()), int(self.sat_top.get())), (50, 50, 50), 2)
-        self.sat3=cv2.resize(self.sat3,(int(self.canvas_img_sat.winfo_width()),125))
+        self.sat3=cv2.resize(self.sat3,(int(self.canvas_img_sat.winfo_width()),int(self.canvas_img_val.winfo_height())))
         self.sat_ratio=int(self.canvas_img_sat.winfo_height())/self.saturations.shape[0]
         self.sat4 = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.sat3))
         self.canvas_img_sat.create_image(0,0, image=self.sat4, anchor=NW)
@@ -738,7 +739,7 @@ class Interface(Frame):
         values=self.values.copy()
         self.val3=cv2.line(values, (0,int(self.val_bot.get())),(int(self.canvas_img_val.winfo_width()),int(self.val_bot.get())),(200,200,200),2)
         self.val3 = cv2.line(values, (0, int(self.val_top.get())),(int(self.canvas_img_val.winfo_width()), int(self.val_top.get())), (50, 50, 50), 2)
-        self.val3=cv2.resize(self.val3,(int(self.canvas_img_val.winfo_width()),125))
+        self.val3=cv2.resize(self.val3,(int(self.canvas_img_val.winfo_width()),int(self.canvas_img_val.winfo_height())))
         self.val_ratio=int(self.canvas_img_val.winfo_height())/self.values.shape[0]
         self.val4 = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.val3))
         self.canvas_img_val.create_image(0,0, image=self.val4, anchor=NW)
@@ -926,13 +927,14 @@ class Interface(Frame):
                 load_frame.show_load(img/len(self.Datas_generales))
                 self.Datas_generales[img]["Particles"]=[]
 
-                for target in range(len(self.Datas_generales[img]["Target"])):
-                    self.Datas_generales[img]["Particles"].append( Fun.find_particles(self.Images[img], self.Datas_generales[img]["Target"][target], (
-                    int(float(self.hue_bot.get()) / 2), int(float(self.hue_top.get()) / 2)), (
-                                                                 (int(float(self.sat_bot.get()))),
-                                                                 int(float(self.sat_top.get()))), (
-                                                                 int(float(self.val_bot.get())),
-                                                                 int(float(self.val_top.get())))))
+                for target in range(len(self.Datas_generales[img]["Target"][0])):
+                    if self.Datas_generales[self.Current_img]["Target"][1][0][target][3] == -1:
+                        self.Datas_generales[img]["Particles"].append( Fun.find_particles(self.Images[img], self.Datas_generales[img]["Target"],target, (
+                        int(float(self.hue_bot.get()) / 2), int(float(self.hue_top.get()) / 2)), (
+                                                                     (int(float(self.sat_bot.get()))),
+                                                                     int(float(self.sat_top.get()))), (
+                                                                     int(float(self.val_bot.get())),
+                                                                     int(float(self.val_top.get())))))
             self.afficher_min()
             self.modif_image()
         self.update()
@@ -1099,10 +1101,10 @@ class Interface(Frame):
                 grey = cv2.cvtColor(self.Images[self.Current_img], cv2.COLOR_RGB2GRAY)
                 mask = np.zeros(grey.shape, dtype=np.uint8)
                 if len(self.Datas_generales[self.Current_img][self.which_tool.get()]) > 0 and np.any(self.Datas_generales[self.Current_img][self.which_tool.get()][0] != None):
-                    mask = cv2.drawContours(mask, self.Datas_generales[self.Current_img][self.which_tool.get()], -1, (255), -1)
+                    mask = cv2.drawContours(mask, self.Datas_generales[self.Current_img][self.which_tool.get()][0], -1, (255), -1)
 
                 cv2.circle(mask, (int(X), int(Y)),self.tool_size, (color), -1)
-                New_cnts, _ = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+                New_cnts = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
                 self.Datas_generales[self.Current_img][self.which_tool.get()] = New_cnts
                 self.last_pt=[int(X), int(Y)]
             self.modif_image(show=[int(X), int(Y)])
@@ -1122,11 +1124,11 @@ class Interface(Frame):
         mask = np.zeros(grey.shape, dtype=np.uint8)
         if len(self.Datas_generales[self.Current_img][self.which_tool.get()]) > 0 and np.any(
                 self.Datas_generales[self.Current_img][self.which_tool.get()][0] != None):
-            mask = cv2.drawContours(mask, self.Datas_generales[self.Current_img][self.which_tool.get()], -1, (255), -1)
+            mask = cv2.drawContours(mask, self.Datas_generales[self.Current_img][self.which_tool.get()][0], -1, (255), -1)
         pts = np.array(self.pt_Poly, np.int32)
         pts = pts.reshape((-1, 1, 2))
         cv2.drawContours(mask, [pts], -1, color, -1)
-        New_cnts, _ = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+        New_cnts = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
         self.Datas_generales[self.Current_img][self.which_tool.get()] = New_cnts
 
         self.pt_Poly = []
@@ -1145,107 +1147,6 @@ class Interface(Frame):
 
 
 
-    def save_particles(self):
-        load_frame = Loading.Loading(self.frame_main)  # Progression bar
-        load_frame.show_load(0)
-        file_to_save = filedialog.asksaveasfilename(defaultextension=".csv")
-        with open(file_to_save, 'w', newline='') as csv_file:
-            writer = csv.writer(csv_file, delimiter=";")
-            Names = ["File", "Type", "Target_ID", "ID", "Area", "Mean_Hue", "Mean_Saturation", "Mean_Value"]
-            writer.writerow(Names)
-
-            for i in range(len(self.Datas_generales)):
-                load_frame.show_load(i/len(self.Datas_generales))
-                ratio_mm = float(self.distance.get()) / math.sqrt((self.Datas_generales[i]["Scale"][0][0] - self.Datas_generales[i]["Scale"][1][0]) ** 2 + (
-                            self.Datas_generales[i]["Scale"][0][1] - self.Datas_generales[i]["Scale"][1][1]) ** 2)
-
-
-                for j in range(len(self.Datas_generales[i]["Target"])):
-                    File = self.Datas_generales[i]["File"]
-                    Type = "Target"
-                    Fish_ID=j
-                    ID = j
-                    Area = cv2.contourArea(self.Datas_generales[i]["Target"][j])
-                    Area_mm = Area * (ratio_mm ** 2)
-                    hsv = cv2.cvtColor(self.Images[i], cv2.COLOR_RGB2HSV)
-                    grey = cv2.cvtColor(self.Images[i], cv2.COLOR_RGB2GRAY)
-                    mask = np.zeros(grey.shape, dtype=np.uint8)
-                    mask = cv2.drawContours(mask, [self.Datas_generales[i]["Target"][j]], -1, (255, 255, 255), -1)
-                    ret, mask = cv2.threshold(mask, 50, 255, cv2.THRESH_BINARY)
-                    _, Mean_S, Mean_V, _ = cv2.mean(hsv, mask)
-
-                    #We calculate the mean hue ourselves to avoid problem with circularity (0-360 hue values)
-                    hues = hsv[:, :, 0]
-                    hues_values = hues[mask > 0]
-                    Mean_H=circmean(hues_values, high=180, low=0)
-                    raw = [File, Type, Fish_ID, ID, Area_mm, Mean_H*2, Mean_S, Mean_V]
-                    writer.writerow(raw)
-
-
-                    #We calcualte the average hsv of all particles
-                    Type="All_particles"
-                    mask = np.zeros(grey.shape, dtype=np.uint8)
-                    mask_parts = cv2.drawContours(mask, self.Datas_generales[i]["Particles"][j], -1,(255, 255, 255), -1)
-                    ret, mask_parts = cv2.threshold(mask_parts, 50, 255, cv2.THRESH_BINARY)
-                    _, Mean_S, Mean_V, _ = cv2.mean(hsv, mask_parts)
-                    #We calculate the mean hue ourselves to avoid problem with circularity (0-360 hue values)
-                    hues = hsv[:, :, 0]
-                    hues_values = hues[mask_parts > 0]
-                    Mean_H=circmean(hues_values, high=180, low=0)
-                    Area = len(hues_values)
-                    Area_mm = Area * (ratio_mm ** 2)
-
-                    raw = [File, Type, Fish_ID, ID, Area_mm, Mean_H*2, Mean_S, Mean_V]
-                    writer.writerow(raw)
-
-
-
-                for target in range(len(self.Datas_generales[i]["Particles"])):
-                    load_frame.show_load((i+target/len(self.Datas_generales[i]["Particles"])) / len(self.Datas_generales))
-                    for j in range(len(self.Datas_generales[i]["Particles"][target])):
-                        File = self.Datas_generales[i]["File"]
-                        Type = "Particle"
-                        Fish_ID = target
-                        ID = j
-                        Area = cv2.contourArea(self.Datas_generales[i]["Particles"][target][j])
-                        Area_mm = Area * (ratio_mm ** 2)
-                        if Area_mm > 1:
-                            hsv = cv2.cvtColor(self.Images[i], cv2.COLOR_RGB2HSV)
-                            grey = cv2.cvtColor(self.Images[i], cv2.COLOR_RGB2GRAY)
-                            mask = np.zeros(grey.shape, dtype=np.uint8)
-                            mask = cv2.drawContours(mask, [self.Datas_generales[i]["Particles"][target][j]], -1, (255, 255, 255), -1)
-                            ret, mask = cv2.threshold(mask, 50, 255, cv2.THRESH_BINARY)
-                            _, Mean_S, Mean_V, _ = cv2.mean(hsv, mask)
-
-                            # We calculate the mean hue ourselves to avoid problem with circularity (0-360 hue values)
-                            hues = hsv[:, :, 0]
-                            hues_values = hues[mask > 0]
-                            Mean_H=circmean(hues_values, high=180, low=0)
-                            raw = [File, Type, Fish_ID, ID, Area_mm, Mean_H*2, Mean_S, Mean_V]
-                            writer.writerow(raw)
-
-                for color in ["Yellow","Blue","Red","White"]:
-                    for j in range(len(self.Datas_generales[i][color])):
-                        if not (self.Datas_generales[i][color][j] is None):
-                            File = self.Datas_generales[i]["File"]
-                            Type = color
-                            ID = j
-                            Area = cv2.contourArea(self.Datas_generales[i][color][j])
-                            Area_mm = Area * (ratio_mm ** 2)
-                            hsv = cv2.cvtColor(self.Images[i], cv2.COLOR_RGB2HSV)
-                            grey = cv2.cvtColor(self.Images[i], cv2.COLOR_RGB2GRAY)
-                            mask = np.zeros(grey.shape, dtype=np.uint8)
-                            mask = cv2.drawContours(mask, [self.Datas_generales[i][color][j]], -1, (255, 255, 255), -1)
-                            ret, mask = cv2.threshold(mask, 50, 255, cv2.THRESH_BINARY)
-                            _, Mean_S, Mean_V, _ = cv2.mean(hsv, mask)
-                            # We calculate the mean hue ourselves to avoid problem with circularity (0-360 hue values)
-                            hues = hsv[:, :, 0]
-                            hues_values = hues[mask > 0]
-                            Mean_H=circmean(hues_values, high=180, low=0)
-                            raw = [File, Type, "NA", ID, Area_mm, Mean_H*2, Mean_S, Mean_V]
-                            writer.writerow(raw)
-
-        load_frame.destroy()
 
     def suivant(self):
         if self.Current_img <= (len(self.Images) - 2):
@@ -1365,10 +1266,10 @@ class Interface(Frame):
         self.menubar.entryconfig("Images", state="active")
 
         if len(self.Images)>0:
-            self.menubar.entryconfig("Particles detection", state="active")
+            self.menubar.entryconfig("Detection", state="active")
             self.Current_img=0
         else:
-            self.menubar.entryconfig("Particles detection", state="disabled")
+            self.menubar.entryconfig("Detection", state="disabled")
             self.Current_img = 0
 
     def prepare_GUI_without_proj(self):
@@ -1382,7 +1283,7 @@ class Interface(Frame):
         self.Can_Miniature_img.grid_forget()
 
         self.menubar.entryconfig("Images", state="disabled")
-        self.menubar.entryconfig("Particles detection", state="disabled")
+        self.menubar.entryconfig("Detection", state="disabled")
 
         self.Entry_dist.delete(0, END)
         self.Entry_dist.insert(0, "1")
@@ -1428,7 +1329,7 @@ class Interface(Frame):
             if os.path.isfile(file) and imghdr.what(file):
                 self.Images_names.append(file)
 
-            Actual_fish_cnt = []
+            Actual_fish_cnt = [[],[]]
             pt1, pt2 = [[25,50],[100,50]]
             Actual_particles = []
             Actual_yellow_scale = []
@@ -1529,6 +1430,8 @@ class Interface(Frame):
 
         return (split_range, [low_h, high_h], mean_h)
 
+    def save_particles(self):
+        Extracting_particles.save_particles(self, self.Datas_generales, self.distance, self.Images)
 
 window = Tk()
 window.title("No project - ColCal")

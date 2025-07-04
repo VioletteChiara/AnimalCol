@@ -1,12 +1,12 @@
 import cv2
 import numpy as np
 
-def find_particles(image,target,hue,sat,val):
+def find_particles(image,contours,target,hue,sat,val):
     if not target is None:
         image_grey = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         target_mask = np.zeros_like(image_grey)
 
-        cv2.drawContours(target_mask, [target], -1, 255, -1)
+        cv2.drawContours(target_mask, contours[0], target, 255, -1, hierarchy=contours[1])
         img_hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
 
         if hue[0] < hue[1]:
@@ -18,8 +18,8 @@ def find_particles(image,target,hue,sat,val):
 
         final_mask=cv2.bitwise_and(mask, target_mask)
 
-        cnts2, _ = cv2.findContours(final_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-        return(cnts2)
+        cnts2, hierarchy = cv2.findContours(final_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+        return(cnts2, hierarchy)
 
 
 def find_scale(image,hue,sat,intensity):

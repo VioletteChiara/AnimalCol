@@ -104,7 +104,6 @@ class Auto_param_interface(Frame):
         Button(Image_param, text="Reset", command=self.reset_back).grid(row=5, column=1, sticky="nsew")
 
 
-
         #List of videos
         Video_list = Frame(self)
         Grid.columnconfigure(Video_list, 0, weight=1)
@@ -120,8 +119,6 @@ class Auto_param_interface(Frame):
         # Create canvas and scrollbar
         Canvas_liste = Canvas(Video_list, width=300, height=150)
         Canvas_liste.grid(row=2, column=0, sticky="nsew")
-
-
 
         scrollbar = Scrollbar(Video_list, orient="vertical", command=Canvas_liste.yview)
         scrollbar.grid(row=2, column=1, sticky="ns")
@@ -142,10 +139,7 @@ class Auto_param_interface(Frame):
             chk.grid(row=pos_row, column=0, sticky="w")
 
         self.vid_buttons[curr_vid].set(True)
-
-
         Button(Video_list, text="Validate", font=("Arial", 18), background="green", command=self.validate).grid(row=3, column=0, columnspan=2, sticky="nsew")
-
 
         # Update scrollregion when the frame changes size
         def on_frame_configure(event):
@@ -157,15 +151,15 @@ class Auto_param_interface(Frame):
             canvas_width = event.width
             Canvas_liste.itemconfig(canvas_window, width=canvas_width)
 
+        checkbutton_frame.bind("<Configure>", on_frame_configure)
+        Canvas_liste.bind("<Configure>", on_canvas_configure)
         self.after(200, lambda: (
             self.change_img(self.holder.get()),
             self.update_img()
         ))
-
-        self.parent.bind("<Configure>", self.change_size)
-        checkbutton_frame.bind("<Configure>", on_frame_configure)
-        Canvas_liste.bind("<Configure>", on_canvas_configure)
+        self.update_idletasks()
         self.update()
+        self.parent.bind("<Configure>", self.change_size)
 
 
     def change_size(self, *args):
@@ -241,8 +235,8 @@ class Auto_param_interface(Frame):
         for vid in range(len(self.vid_buttons)):
             if self.vid_buttons[vid].get():
                 img, cnt = self.find_target(img=cv2.imread(self.list_vids[vid]))
-                self.boss.Datas_generales[vid]["Target"] = [cnt]
-                self.boss.Datas_generales[vid]["Particles"] = []
+                self.boss.Datas_generales[vid]["Target"] = [[cnt],[[[-1,-1,-1,-1]]]]
+                self.boss.Datas_generales[vid]["Particles"] = [[],[]]
             load_frame.show_load(vid/len(self.vid_buttons))
 
         load_frame.destroy()
