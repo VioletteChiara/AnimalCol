@@ -6,23 +6,23 @@ def find_particles(image,contours,target,hue,sat,val):
         image_grey = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         target_mask = np.zeros_like(image_grey)
 
-        print(contours[0])
-        print(contours[1])
+        if not contours[0] is None and not contours[0][0] is None:
+            cv2.drawContours(target_mask, contours[0], target, 255, -1, hierarchy=contours[1])
+            img_hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
 
-        cv2.drawContours(target_mask, contours[0], target, 255, -1, hierarchy=contours[1])
-        img_hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+            if hue[0] < hue[1]:
+                mask=cv2.inRange(img_hsv,np.array([hue[0],sat[0],val[0]]),np.array([hue[1],sat[1],val[1]]))
+            else:
+                mask_low = cv2.inRange(img_hsv, np.array([hue[0], sat[0], val[0]]), np.array([180, sat[1], val[1]]))
+                mask_high = cv2.inRange(img_hsv, np.array([0, sat[0], val[0]]), np.array([hue[1], sat[1], val[1]]))
+                mask = cv2.bitwise_or(mask_low, mask_high)
 
-        if hue[0] < hue[1]:
-            mask=cv2.inRange(img_hsv,np.array([hue[0],sat[0],val[0]]),np.array([hue[1],sat[1],val[1]]))
-        else:
-            mask_low = cv2.inRange(img_hsv, np.array([hue[0], sat[0], val[0]]), np.array([180, sat[1], val[1]]))
-            mask_high = cv2.inRange(img_hsv, np.array([0, sat[0], val[0]]), np.array([hue[1], sat[1], val[1]]))
-            mask = cv2.bitwise_or(mask_low, mask_high)
+            final_mask=cv2.bitwise_and(mask, target_mask)
 
-        final_mask=cv2.bitwise_and(mask, target_mask)
+            cnts2, hierarchy = cv2.findContours(final_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+            return(cnts2, hierarchy)
 
-        cnts2, hierarchy = cv2.findContours(final_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-        return(cnts2, hierarchy)
+    return([[],[]])
 
 
 def find_scale(image,hue,sat,intensity):

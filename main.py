@@ -1433,7 +1433,7 @@ class Interface(Frame):
         return (split_range, [low_h, high_h], mean_h)
 
     def save_particles(self):
-        Extracting_particles.save_particles(self, self.Datas_generales, self.distance, self.Images)
+        Extracting_particles.save_particles(self.frame_main, self.Datas_generales, self.distance, self.Images)
 
 window = Tk()
 window.title("No project - ColCal")
