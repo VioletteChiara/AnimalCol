@@ -152,7 +152,8 @@ class Image_show(Frame):
         self.canvas_video.bind("<B1-Motion>", self.callback_move)
         self.canvas_video.bind("<B3-Motion>", self.callback_move_right)
         self.canvas_video.bind("<Motion>", self.mouse_over)
-        self.canvas_video.bind("<ButtonRelease>", self.release)
+        self.canvas_video.bind("<B1-ButtonRelease>", self.release)
+        self.canvas_video.bind("<B3-ButtonRelease>", self.release_right)
         self.canvas_video.bind("<Button-3>", self.right_click)
         self.canvas_video.bind("<Button-1>", self.callback)
 
@@ -167,7 +168,8 @@ class Image_show(Frame):
             self.canvas_video.unbind("<Motion>")
             self.canvas_video.unbind("<Button-1>")
             self.canvas_video.unbind("<B1-Motion>")
-            self.canvas_video.unbind("<ButtonRelease>")
+            self.canvas_video.bind("<B1-ButtonRelease>")
+            self.canvas_video.bind("<B3-ButtonRelease>")
 
         except:
             pass
@@ -240,12 +242,15 @@ class Image_show(Frame):
             if  event.x >= 0 and event.y >= 0 and event.x <= self.Size[1] and event.y <= self.Size[0]:
                 self.boss.right_click((event.x,event.y), event)
 
-    def release(self, event):
+    def release_right(self, event):
+        self.release(event, invert=True)
+
+    def release(self, event, invert=False):
         '''The info about where the frame was clicked is sent to the Video Reader container'''
         event.x = self.ratio * (event.x - (self.canvas_video.winfo_width()-self.shape[1])/2) + self.zoom_sq[0]
         event.y = self.ratio * (event.y - (self.canvas_video.winfo_height()-self.shape[0])/2) + self.zoom_sq[1]
         try:
-            self.boss.released_can((event.x,event.y))
+            self.boss.released_can((event.x,event.y),invert)
         except:
             pass
         self.moving_pt_interest=False

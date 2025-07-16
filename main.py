@@ -4,7 +4,6 @@ import numpy as np
 import cv2
 import PIL.Image, PIL.ImageTk
 import math
-import csv
 import Extracting_particles
 import Functions_find_red as Fun
 import os
@@ -26,7 +25,7 @@ class Interface(Frame):
         Frame.__init__(self, window, width=0, height=0, bd=5, **kwargs)
         '''Main frame of the program'''
 
-        #Configuration of the layout
+        #Configuration of GUI main window
         self.grid()
         self.root=window
         self.root.rowconfigure(0,weight=1)
@@ -53,6 +52,7 @@ class Interface(Frame):
         #Other:
         #Is there a point already selected? (used later to move scale points and polygon points)
         self.pt_selected = None #None if no point is selected, if a point is selected, get it's int value
+        self.moving_pt = False #Flag to know if teh user is moving a point on the image
 
         #The size of the Miniature display (bottom left corner, used to show all images and navigate). This is for initialisation, values are updated later
         self.SizeMin = [10, 10]
@@ -213,7 +213,6 @@ class Interface(Frame):
         # Frame in which the canvas for color selection are displayed
         Color_selection=Frame(Frame_show_col, highlightthickness=5, highlightbackground="#9d9aff", relief="solid")
         Color_selection.grid(row=0, column=0, sticky="nsew")
-
         Color_selection.rowconfigure(0,weight=1)
         Color_selection.rowconfigure(1, weight=1)
         Color_selection.rowconfigure(2, weight=1)
@@ -251,11 +250,9 @@ class Interface(Frame):
         self.canvas_img_val.bind("<Button-1>",self.move_val)
         self.canvas_img_val.bind("<B1-Motion>", self.drag_val)
 
-
         ## Display of the selected colors (so that user can see clearly how the combination of hue/sat/val looks like
         Selected_color = Frame(Frame_show_col, highlightthickness=5, highlightbackground="#9affb9", relief="solid")
         Selected_color.grid(row=0, column=1, sticky="nswe")
-
         Color_selection.rowconfigure(0,weight=1)
         Color_selection.rowconfigure(1, weight=1)
         Color_selection.columnconfigure(0, weight=1)
@@ -272,8 +269,6 @@ class Interface(Frame):
         #A second canvas to change the hue
         self.canvas_img_hue = Canvas(Selected_color, width=20, height=100, bd=0, highlightthickness=0, relief='flat')
         self.canvas_img_hue.grid(row=1, column=1)
-
-
 
         #Bellow the clickable canvas, we have Entries allowing to display teh values or write them directly.
         self.canvas_choice_couleurs = Canvas(self.canvas_user, width=10, height=10, bd=0, highlightthickness=0,relief='flat')
@@ -318,7 +313,6 @@ class Interface(Frame):
         bouton_Valider_all = Button(self.canvas_choice_couleurs, text="Validate all", fg="white", bg="orange",
                                          command=self.validate_all)
         bouton_Valider_all.grid(row=3, column=2, columnspan=2, sticky="nswe")
-
 
 
         ##Bellow the color selection, we find the Tool informations. The tool is how the user interact with the current image
@@ -387,14 +381,11 @@ class Interface(Frame):
         self.update_min.grid(row=1, column=0)
 
 
-
         #We finally prepare the project
         self.empty_proj() # This function is used at initiation and later to close projects
         self.shown_col = [int(self.hue_bot.get()), 0]        # Variable keeping the hue value to be displayed and corresponding Y position in "self.canvas_img_hue"
         self.update()
         self.update_show() # Update the canvas to show colors
-
-
 
     def change_auto_part(self):
         '''This function change the automatic particle fiinder mode from activated to disabled.
@@ -419,16 +410,17 @@ class Interface(Frame):
         '''Change the values for when there is no project open
         redo: boolean, True= all the data will have to be redone, False=we keep the scale data'''
         #Minimum values everywhere
+        # Hue
         self.hue_bot.delete(0, END)
         self.hue_bot.insert(0, "0")
         self.hue_top.delete(0, END)
         self.hue_top.insert(0, "1")
-
+        # Saturation
         self.sat_bot.delete(0, END)
         self.sat_bot.insert(0, "0")
         self.sat_top.delete(0, END)
         self.sat_top.insert(0, "0")
-
+        # Value
         self.val_bot.delete(0, END)
         self.val_bot.insert(0, "0")
         self.val_top.delete(0, END)
@@ -444,7 +436,7 @@ class Interface(Frame):
     def create_project(self):
         '''Create a new project from scratch'''
         self.empty_proj()#Prepare GUI
-        self.Datas_generales=[]#Where the data will be saved
+        self.Datas_generales=[]#List storing most of the data
         self.Images_names=[]#Names of all image files
         self.Images=[]#Images themselves
         self.save_as()#Save the new project somewhere
@@ -455,7 +447,7 @@ class Interface(Frame):
 
 
     def On_mousewheel(self,event):
-        '''The miniature can be moved along with the mousewheel'''
+        '''The miniature can be scrolled with the mousewheel'''
         if len(self.Images)>0:
             if event.widget == self.Can_Miniature_img:#If the mouse is abose the miniature
                 new_pos=self.defilement.get() - (event.delta / 10)
@@ -464,10 +456,19 @@ class Interface(Frame):
                     self.scale_tool_size.set(new_pos)
                     self.defile(int(new_pos))
 
-
+    def defile(self, val):
+        #We update the miniature
+        if len(self.Images) > 0:
+            val = int(val)
+            self.cutted_Miniature = self.Miniature[(val - 250):val, 0:self.SizeMin_cut[1]]
+            self.min_show = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.cutted_Miniature))
+            self.can_min = self.Can_Miniature_img.create_image(0, 0, image=self.min_show, anchor=NW)
+            self.Can_Miniature_img.config(width=int(self.SizeMin_cut[1]), height=int(self.SizeMin_cut[0]))
+            self.Can_Miniature_img.itemconfig(self.can_min, image=self.min_show)
+            self.update()
 
     def callback_miniature(self, event):
-        '''What happen when the miniature is pressed'''
+        '''When the miniature is pressed the image clicked will be the one selected'''
         Position = self.defilement.get() - (250 - event.y)#Position relative to teh miniature
         possible_Pos = [*range(int(self.SizeMin[0] / len(self.Images)), self.SizeMin[0]+1, int(self.SizeMin[0] / len(self.Images)))]
         for Poss in range(len(possible_Pos)):
@@ -486,42 +487,34 @@ class Interface(Frame):
                     self.Image_prec.config(state="disabled")
                 else:
                     self.Image_prec.config(state="normal")
-
+                #Update the view
                 self.canvas_main_img.name=self.Images_names[self.Current_img]
                 self.modif_image()
                 break
 
-    def defile(self, val):
-        #We update the miniature
-        if len(self.Images) > 0:
-            val = int(val)
-            self.cutted_Miniature = self.Miniature[(val - 250):val, 0:self.SizeMin_cut[1]]
-            self.min_show = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.cutted_Miniature))
-            self.can_min = self.Can_Miniature_img.create_image(0, 0, image=self.min_show, anchor=NW)
-            self.Can_Miniature_img.config(width=int(self.SizeMin_cut[1]), height=int(self.SizeMin_cut[0]))
-            self.Can_Miniature_img.itemconfig(self.can_min, image=self.min_show)
-            self.update()
-
     def modif_image(self, show=None):
-        self.img_to_show=self.transfo_img(self.Current_img)
+        #We update the image. Show argument indicates whether we should show the tool or not
+        self.img_to_show=self.transfo_img(self.Current_img)#Transform the original image (add drawings on top of the image)
         tmp_img = self.img_to_show.copy()
-        if not show is None:
+        if not show is None: #If show, we draw a circle indicating the tool size
             tmp_img = cv2.circle(tmp_img, show, self.tool_size, (255, 0, 0),
                                  max([1, int(2 * self.canvas_main_img.ratio)]))
-        self.canvas_main_img.afficher_img(tmp_img)
+        self.canvas_main_img.afficher_img(tmp_img)#Show the image
 
 
     def transfo_img(self, image_ID):
+        '''This function draw all the elements on top of the currently selected image (for instance particles, target contours, etc.)'''
         if len(self.Images)>0:
+            #overlay is the image used to create transparent-like shapes
             overlay = np.zeros(self.Images[image_ID].shape, dtype=np.uint8)
-            for target in range(len(self.Datas_generales[image_ID]["Particles"])):
+            for target in range(len(self.Datas_generales[image_ID]["Particles"])):#We draw all the particles
                 if len(self.Datas_generales[image_ID]["Particles"][target])>0:
                     overlay = cv2.drawContours(overlay, self.Datas_generales[image_ID]["Particles"][target][0], -1, (0, 0, 255), -1)
             opacity = 0.75
 
             TMP_image = np.copy(self.Images[image_ID])
 
-            # Echelle
+            # Draw the scale points and line
             TMP_image = cv2.line(TMP_image, tuple(self.Datas_generales[image_ID]["Scale"][0]),
                                  tuple(self.Datas_generales[image_ID]["Scale"][1]), (255, 0, 150), max([1,int(2*self.canvas_main_img.ratio)]))
             TMP_image = cv2.circle(TMP_image, tuple(self.Datas_generales[image_ID]["Scale"][0]),
@@ -531,20 +524,22 @@ class Interface(Frame):
 
             # Selection_Poly
             for pt in range(len(self.pt_Poly)):
-                TMP_image = cv2.circle(TMP_image, tuple(self.pt_Poly[pt]), max([1,int(10*self.canvas_main_img.ratio)]), (0, 255, 0), -1)
+                TMP_image = cv2.circle(TMP_image, tuple(self.pt_Poly[pt]), max([1,int(4*self.canvas_main_img.ratio)]), (0, 255, 0), -1)
                 if pt > 0:
                     TMP_image = cv2.line(TMP_image, tuple(self.pt_Poly[pt - 1]), tuple(self.pt_Poly[pt]), (0, 255, 0), max([1,int(2*self.canvas_main_img.ratio)]))
 
+            #We add the transparent shapes
             TMP_image = cv2.addWeighted(TMP_image, 1, overlay, opacity, 0)
 
+            #Drawing the target
             if self.Datas_generales[image_ID]["Target"][0] is not None:
                 TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Target"][0], -1, (250, 0, 0), max([1,int(2*self.canvas_main_img.ratio)]))
-
+            # Drawing the particles (borders)
             if self.Datas_generales[image_ID]["Particles"] is not None:
                 for target in range(len(self.Datas_generales[image_ID]["Particles"])):
                     if len(self.Datas_generales[image_ID]["Particles"][target]) > 0:
                         TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Particles"][target][0], -1, (0, 0, 250), max([1,int(1*self.canvas_main_img.ratio)]))
-
+            # Drawing the color references ROIs
             if len(self.Datas_generales[image_ID]["Red"]) > 0 and self.Datas_generales[image_ID]["Red"][0] is not None:
                 TMP_image = cv2.drawContours(TMP_image, self.Datas_generales[image_ID]["Red"][0], -1, (150, 0, 0), max([1,int(4*self.canvas_main_img.ratio)]))
 
@@ -559,33 +554,28 @@ class Interface(Frame):
 
             return (TMP_image)
         else:
-            return(self.blank)
+            return(self.blank) #If there is no image in the project, we use a blank one
 
     def afficher_min(self):
+        '''This function build the miniature. It is a vertical stack of all the images taken together'''
         min_width=400
-        if len(self.Images) > 0:
-            for ImG in range(len(self.Images)):
-                if ImG == 0:
-                    TMP_min = self.transfo_img(ImG)
-                    ratio=TMP_min.shape[1]/min_width
-                    TMP_min=cv2.resize(TMP_min,[min_width,int(TMP_min.shape[0]/ratio)])
-                    name = self.Images_names[ImG].split("/")[-1]
-                    TMP_min = cv2.putText(TMP_min, name, (10, TMP_min.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                                          (255, 255, 255), 3, cv2.LINE_AA)
-                    TMP_min = cv2.putText(TMP_min, name, (10, TMP_min.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                                          (0, 0, 0), 1, cv2.LINE_AA)
-                    self.Miniature = TMP_min
-                else:
-                    TMP_min = self.transfo_img(ImG)
-                    ratio=TMP_min.shape[1]/min_width
-                    TMP_min=cv2.resize(TMP_min,[min_width,int(TMP_min.shape[0]/ratio)])
-                    name = self.Images_names[ImG].split("/")[-1]
-                    TMP_min = cv2.putText(TMP_min, name, (10, TMP_min.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                                          (255, 255, 255), 3, cv2.LINE_AA)
-                    TMP_min = cv2.putText(TMP_min, name, (10, TMP_min.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                                          (0, 0, 0), 1, cv2.LINE_AA)
-                    self.Miniature = np.concatenate((self.Miniature, TMP_min), axis=0)
+        for ImG in range(len(self.Images)):#For each image
+            TMP_min = self.transfo_img(ImG)#We update the image itself (add drawings)
 
+            #Image is then resized to match the miniature size
+            ratio = TMP_min.shape[1] / min_width
+            TMP_min = cv2.resize(TMP_min, [min_width, int(TMP_min.shape[0] / ratio)])
+            name = self.Images_names[ImG].split("/")[-1]
+            TMP_min = cv2.putText(TMP_min, name, (10, TMP_min.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                                  (255, 255, 255), 3, cv2.LINE_AA)
+            TMP_min = cv2.putText(TMP_min, name, (10, TMP_min.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                                  (0, 0, 0), 1, cv2.LINE_AA)
+            if ImG == 0:
+                self.Miniature = TMP_min
+            else:
+                self.Miniature = np.concatenate((self.Miniature, TMP_min), axis=0)
+
+            #Display the miniature
             SizeMin = self.Miniature.shape
             self.cutted_Miniature = self.Miniature[self.defilement.get() - 250: self.defilement.get(), 0:SizeMin[1]]
             self.SizeMin_cut = self.cutted_Miniature.shape
@@ -600,15 +590,19 @@ class Interface(Frame):
 
 
     def moved_can_right(self, pos, event):
-        self.moved_can(pos, event,invert=True)
+        '''Right click and move on the main canvas. pos is the position of the cursor, event is the tkinter event return'''
+        self.moved_can(pos, event,invert=True)#Trigger the click and drag inverted (bacause right click)
 
     def moved_can(self, pos, event, invert=False):
+        '''Click and move on the main canvas. pos is the position of the cursor, event is the tkinter event return'''
         if not bool(event.state & 0x0001) and not bool(event.state & 0x0004):
+            #If no Ctrl or Shift pressed
             pos=list(pos)
             pos[0]=int(pos[0])
             pos[1] = int(pos[1])
-            if self.pt_selected != None:
-                if self.pt_selected == 1:
+            if self.pt_selected != None: #If we had a point selected (i.e. user is moving that point), we update the position of this point
+                self.moving_pt=True
+                if self.pt_selected == 1:#Point selected 1 and 2 are points used for the scale. Higher values are for the polygon tool.
                     self.Datas_generales[self.Current_img]["Scale"][0][0] = pos[0]
                     self.Datas_generales[self.Current_img]["Scale"][0][1] = pos[1]
                     self.modif_image()
@@ -623,7 +617,8 @@ class Interface(Frame):
                     self.modif_image()
 
             elif self.tool_type.get() == "Pencil":
-                if self.tool_add.get():
+                #If no point was selected, and that the tool is a pencil, we draw/erase elements on the image
+                if self.tool_add.get():#If we amplify the element or erase it
                     color = 255
                 else:
                     color = 0
@@ -636,17 +631,21 @@ class Interface(Frame):
                 if len(self.Datas_generales[self.Current_img][self.which_tool.get()]) > 0 and np.any(self.Datas_generales[self.Current_img][self.which_tool.get()][0] != None):
                     mask = cv2.drawContours(mask, self.Datas_generales[self.Current_img][self.which_tool.get()][0], -1, (255), -1)
                 cv2.line(mask, pos, self.last_pt, (color), int(self.tool_size*2))
+
+                #We update the data and show the result
                 New_cnts = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
                 self.Datas_generales[self.Current_img][self.which_tool.get()] = New_cnts
+                self.modif_image(show=pos)
 
             self.last_pt=pos
 
-            self.modif_image(show=pos)
+    def released_can(self, event, invert=False):
 
+        if self.pt_selected==3 and not self.moving_pt:
+            self.fill_Poly(invert)
 
-
-    def released_can(self, event):
         self.pt_selected = None
+        self.moving_pt = False
         self.last_pt=None
         if self.auto_update:
             self.validate()
@@ -979,7 +978,8 @@ class Interface(Frame):
 
     def mouse_over(self, pos):
         tmp_img=self.img_to_show.copy()
-        tmp_img=cv2.circle(tmp_img,pos,self.tool_size,(255,0,0),max([1,int(2*self.canvas_main_img.ratio)]))
+        if self.tool_type.get() == "Pencil":
+            tmp_img=cv2.circle(tmp_img,pos,self.tool_size,(255,0,0),max([1,int(2*self.canvas_main_img.ratio)]))
         self.affiche_mouse(pos)
         self.canvas_main_img.afficher_img(tmp_img)
 
@@ -1069,9 +1069,9 @@ class Interface(Frame):
             self.update_show()
 
         elif not bool(event.state & 0x0001) and not bool(event.state & 0x0004):
-            if math.sqrt((X - self.Datas_generales[self.Current_img]["Scale"][0][0]) ** 2 + (Y - self.Datas_generales[self.Current_img]["Scale"][0][1]) ** 2) < 20:
+            if math.sqrt((X - self.Datas_generales[self.Current_img]["Scale"][0][0]) ** 2 + (Y - self.Datas_generales[self.Current_img]["Scale"][0][1]) ** 2) < max([1,(5*self.canvas_main_img.ratio)]):
                 self.pt_selected = 1
-            elif math.sqrt((X - self.Datas_generales[self.Current_img]["Scale"][1][0]) ** 2 + (Y - self.Datas_generales[self.Current_img]["Scale"][1][1]) ** 2) < 20:
+            elif math.sqrt((X - self.Datas_generales[self.Current_img]["Scale"][1][0]) ** 2 + (Y - self.Datas_generales[self.Current_img]["Scale"][1][1]) ** 2) < max([1,(5*self.canvas_main_img.ratio)]):
                 self.pt_selected = 2
 
             elif self.tool_type.get() == "Poly":
@@ -1079,15 +1079,13 @@ class Interface(Frame):
                 pt_find = False
                 while not pt_find and compteur < len(self.pt_Poly):
                     if math.sqrt(
-                            (X - self.pt_Poly[compteur][0]) ** 2 + (Y - self.pt_Poly[compteur][1]) ** 2) < 20:
+                            (X - self.pt_Poly[compteur][0]) ** 2 + (Y - self.pt_Poly[compteur][1]) ** 2) < max([1,(5*self.canvas_main_img.ratio)]):
                         pt_find = True
-                        if compteur != 0 or len(self.pt_Poly) == 1:
-                            self.pt_selected = 3 + compteur
-                        if compteur == 0:
-                            self.fill_Poly(invert)
+                        self.pt_selected = 3 + compteur
                     compteur = compteur + 1
 
                 if not pt_find:
+                    self.moving_pt=True
                     self.pt_Poly.append([int(X), int(Y)])
                     self.pt_selected = len(self.pt_Poly) + 3 - 1
 
@@ -1109,7 +1107,7 @@ class Interface(Frame):
                 New_cnts = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
                 self.Datas_generales[self.Current_img][self.which_tool.get()] = New_cnts
                 self.last_pt=[int(X), int(Y)]
-            self.modif_image(show=[int(X), int(Y)])
+                self.modif_image(show=[int(X), int(Y)])
 
 
     def right_click(self, pos, event):
@@ -1135,7 +1133,7 @@ class Interface(Frame):
 
         self.pt_Poly = []
         self.pt_selected = None
-        self.modif_image([X,Y])
+        self.modif_image()
 
 
     def close(self):
@@ -1437,5 +1435,6 @@ class Interface(Frame):
 
 window = Tk()
 window.title("No project - ColCal")
+window.iconbitmap(User_loading.resource_path(os.path.join("Logo_AnimalCol.ico")))
 interface = Interface(window)
 interface.mainloop()
