@@ -928,9 +928,8 @@ class Interface(Frame):
                 load_frame.show_load(img/len(self.Datas_generales))
                 self.Datas_generales[img]["Particles"]=[]
 
-                for target in range(len(self.Datas_generales[img]["Target"][0])):
-                    print(target)
-                    if self.Datas_generales[self.Current_img]["Target"][1][0][target][3] == -1:
+                for target in range(len(self.Datas_generales[img]["Target"][1][0])):
+                    if self.Datas_generales[img]["Target"][1][0][target][3] == -1:
                         self.Datas_generales[img]["Particles"].append( Fun.find_particles(self.Images[img], self.Datas_generales[img]["Target"],target, (
                         int(float(self.hue_bot.get()) / 2), int(float(self.hue_top.get()) / 2)), (
                                                                      (int(float(self.sat_bot.get()))),
@@ -1101,7 +1100,7 @@ class Interface(Frame):
 
                 grey = cv2.cvtColor(self.Images[self.Current_img], cv2.COLOR_RGB2GRAY)
                 mask = np.zeros(grey.shape, dtype=np.uint8)
-                if len(self.Datas_generales[self.Current_img][self.which_tool.get()]) > 0 and np.any(self.Datas_generales[self.Current_img][self.which_tool.get()][0] != [None]):
+                if len(self.Datas_generales[self.Current_img][self.which_tool.get()]) > 0 and not self.Datas_generales[self.Current_img][self.which_tool.get()][0] is None:
                     mask = cv2.drawContours(mask, self.Datas_generales[self.Current_img][self.which_tool.get()][0], -1, (255), -1)
 
                 cv2.circle(mask, (int(X), int(Y)),self.tool_size, (color), -1)
@@ -1123,8 +1122,7 @@ class Interface(Frame):
             color=255-color
         grey = cv2.cvtColor(self.Images[self.Current_img], cv2.COLOR_RGB2GRAY)
         mask = np.zeros(grey.shape, dtype=np.uint8)
-        if len(self.Datas_generales[self.Current_img][self.which_tool.get()]) > 0 and np.any(
-                self.Datas_generales[self.Current_img][self.which_tool.get()][0] != None):
+        if len(self.Datas_generales[self.Current_img][self.which_tool.get()]) > 0 and not self.Datas_generales[self.Current_img][self.which_tool.get()][0] is None:
             mask = cv2.drawContours(mask, self.Datas_generales[self.Current_img][self.which_tool.get()][0], -1, (255), -1)
         pts = np.array(self.pt_Poly, np.int32)
         pts = pts.reshape((-1, 1, 2))

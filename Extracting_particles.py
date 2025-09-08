@@ -23,7 +23,7 @@ def save_particles(load_frame, Datas_generales, distance, Images):
                         Datas_generales[i]["Scale"][0][1] - Datas_generales[i]["Scale"][1][1]) ** 2)
 
             target=0
-            for j in range(len(Datas_generales[i]["Target"][0])):
+            for j in range(len(Datas_generales[i]["Target"][1][0])):
                 if Datas_generales[i]["Target"][1][0][j][3]==-1:
                     File = Datas_generales[i]["File"]
                     Type = "Target"

@@ -235,7 +235,10 @@ class Auto_param_interface(Frame):
         for vid in range(len(self.vid_buttons)):
             if self.vid_buttons[vid].get():
                 img, cnt = self.find_target(img=cv2.imread(self.list_vids[vid]))
-                self.boss.Datas_generales[vid]["Target"] = [[cnt], np.array([[[ -1, -1, -1, -1 ]]], dtype=np.int32)]
+                if cnt is None :
+                    self.boss.Datas_generales[vid]["Target"] = [[], np.array([[[-1, -1, -1, -1]]], dtype=np.int32)]
+                else:
+                    self.boss.Datas_generales[vid]["Target"] = [[cnt], np.array([[[ -1, -1, -1, -1 ]]], dtype=np.int32)]
                 self.boss.Datas_generales[vid]["Particles"] = []
             load_frame.show_load(vid/len(self.vid_buttons))
 
