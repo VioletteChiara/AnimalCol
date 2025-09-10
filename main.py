@@ -1,3 +1,4 @@
+import tkinter.messagebox
 from tkinter import *
 from tkinter import filedialog
 import numpy as np
@@ -363,21 +364,25 @@ class Interface(Frame):
         tool_Scale_W.grid(row=0, column=4)
 
         ###The Miniature Canvas shows all the images from the project. It allow to have a fast view of everything and b=navigate easily.
-        self.Can_Miniature = Canvas(self.canvas_user, height=10, bd=2, highlightthickness=1, relief='groove', background="orange")
+        self.Can_Miniature = Canvas(self.canvas_user, height=10, bd=2, highlightthickness=1, relief='groove')
         self.Can_Miniature.grid(row=5, column=0, sticky="ns")
+        self.Can_Miniature.rowconfigure(0, weight=1000)
+        self.Can_Miniature.rowconfigure(1, weight=1)
+        self.Can_Miniature.columnconfigure(0, weight=1000)
+        self.Can_Miniature.columnconfigure(1, weight=1)
         #The main Canvas containing the displayed image
-        self.Can_Miniature_img = Canvas(self.Can_Miniature, height=10, bd=2, highlightthickness=1, relief='flat')
+        self.Can_Miniature_img = Canvas(self.Can_Miniature, bd=2, highlightthickness=1, relief='flat')
         self.Can_Miniature_img.grid(row=0, column=0, sticky="ns")
         self.Can_Miniature_img.bind("<Button-1>", self.callback_miniature)
         self.Can_Miniature_img.bind_all("<MouseWheel>", self.On_mousewheel)
         #We have a scrollbar allowing to move the miniature canvas around (not a real movement of the canvas image as it would require too much memory, it fakes the movement)
         self.defilement = IntVar()
-        self.defilement.set(250)
-        self.scale_tool_size = Scale(self.Can_Miniature, showvalue=0, from_=250, to=self.SizeMin[0] - 1, resolution=1, variable=self.defilement, orient=VERTICAL, length=250, command=self.defile)
-        self.scale_tool_size.grid(row=0, column=1)
-        self.scale_tool_size.set(250)
+        self.defilement.set(self.Can_Miniature_img.winfo_height())
+        self.scale_tool_size = Scale(self.Can_Miniature, showvalue=0, from_=self.Can_Miniature_img.winfo_height(), to=self.SizeMin[0] - 1, resolution=1, variable=self.defilement, orient=VERTICAL, length=self.Can_Miniature_img.winfo_height(), command=self.defile)
+        self.scale_tool_size.grid(row=0, column=1, sticky="ns")
+        self.scale_tool_size.set(self.Can_Miniature_img.winfo_height())
         #We have a button to update this miniature canvas because auto-update would be unnecessarily time-consuming
-        self.update_min = Button(self.Can_Miniature, text="Update_view", command=self.afficher_min)
+        self.update_min = Button(self.Can_Miniature, text="Update view", command=self.afficher_min)
         self.update_min.grid(row=1, column=0)
 
 
@@ -386,6 +391,15 @@ class Interface(Frame):
         self.shown_col = [int(self.hue_bot.get()), 0]        # Variable keeping the hue value to be displayed and corresponding Y position in "self.canvas_img_hue"
         self.update()
         self.update_show() # Update the canvas to show colors
+
+        self.bind("<Configure>", self.update_size_min)
+
+
+    def update_size_min(self, *args):
+        if self.defilement.get()<self.Can_Miniature_img.winfo_height():
+            self.defilement.set(self.Can_Miniature_img.winfo_height())
+        self.scale_tool_size.config(from_=self.Can_Miniature_img.winfo_height())
+        self.defile(self.defilement.get())
 
     def change_auto_part(self):
         '''This function change the automatic particle fiinder mode from activated to disabled.
@@ -451,7 +465,7 @@ class Interface(Frame):
         if len(self.Images)>0:
             if event.widget == self.Can_Miniature_img:#If the mouse is abose the miniature
                 new_pos=self.defilement.get() - (event.delta / 10)
-                if new_pos > 250 and new_pos <self.SizeMin[0]:#if we are not higher than max, lower than min
+                if new_pos >= self.Can_Miniature_img.winfo_height() and new_pos <self.SizeMin[0]:#if we are not higher than max, lower than min
                     self.defilement.set(new_pos)
                     self.scale_tool_size.set(new_pos)
                     self.defile(int(new_pos))
@@ -460,16 +474,20 @@ class Interface(Frame):
         #We update the miniature
         if len(self.Images) > 0:
             val = int(val)
-            self.cutted_Miniature = self.Miniature[(val - 250):val, 0:self.SizeMin_cut[1]]
+
+            if (val<self.Can_Miniature_img.winfo_height()):
+                val=self.Can_Miniature_img.winfo_height()
+
+            self.cutted_Miniature = self.Miniature[(val - self.Can_Miniature_img.winfo_height()):val, 0:self.SizeMin_cut[1]]
             self.min_show = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.cutted_Miniature))
             self.can_min = self.Can_Miniature_img.create_image(0, 0, image=self.min_show, anchor=NW)
-            self.Can_Miniature_img.config(width=int(self.SizeMin_cut[1]), height=int(self.SizeMin_cut[0]))
+            self.Can_Miniature_img.config(width=int(self.SizeMin_cut[1]))
             self.Can_Miniature_img.itemconfig(self.can_min, image=self.min_show)
             self.update()
 
     def callback_miniature(self, event):
         '''When the miniature is pressed the image clicked will be the one selected'''
-        Position = self.defilement.get() - (250 - event.y)#Position relative to teh miniature
+        Position = self.defilement.get() - (self.Can_Miniature_img.winfo_height() - event.y)#Position relative to teh miniature
         possible_Pos = [*range(int(self.SizeMin[0] / len(self.Images)), self.SizeMin[0]+1, int(self.SizeMin[0] / len(self.Images)))]
         for Poss in range(len(possible_Pos)):
             if Position < possible_Pos[Poss]:
@@ -577,16 +595,18 @@ class Interface(Frame):
 
             #Display the miniature
             SizeMin = self.Miniature.shape
-            self.cutted_Miniature = self.Miniature[self.defilement.get() - 250: self.defilement.get(), 0:SizeMin[1]]
+            self.cutted_Miniature = self.Miniature[self.defilement.get() - self.Can_Miniature_img.winfo_height(): self.defilement.get(), 0:SizeMin[1]]
             self.SizeMin_cut = self.cutted_Miniature.shape
 
             self.min_show = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.cutted_Miniature))
             self.can_min = self.Can_Miniature_img.create_image(0, 0, image=self.min_show, anchor=NW)
-            self.Can_Miniature_img.config(width=int(self.SizeMin_cut[1]), height=int(self.SizeMin_cut[0]))
+            self.Can_Miniature_img.config(width=int(self.SizeMin_cut[1]))
             self.Can_Miniature_img.itemconfig(self.can_min, image=self.min_show)
 
         else:
             self.Can_Miniature_img.delete("all")
+
+        self.defile(self.defilement.get())
 
 
     def moved_can_right(self, pos, event):
@@ -1217,39 +1237,41 @@ class Interface(Frame):
         self.load_images(load_frame)
         load_frame.destroy()
 
-        self.hue_bot.delete(0, END)
-        self.hue_bot.insert(0, Params[0])
-        self.hue_top.delete(0, END)
-        self.hue_top.insert(0, Params[1])
+        if not self.do_not_open:
 
-        self.sat_bot.delete(0, END)
-        self.sat_bot.insert(0, Params[2])
-        self.sat_top.delete(0, END)
-        self.sat_top.insert(0, Params[3])
+            self.hue_bot.delete(0, END)
+            self.hue_bot.insert(0, Params[0])
+            self.hue_top.delete(0, END)
+            self.hue_top.insert(0, Params[1])
 
-        self.val_bot.delete(0, END)
-        self.val_bot.insert(0, Params[4])
-        self.val_top.delete(0, END)
-        self.val_top.insert(0, Params[5])
+            self.sat_bot.delete(0, END)
+            self.sat_bot.insert(0, Params[2])
+            self.sat_top.delete(0, END)
+            self.sat_top.insert(0, Params[3])
 
-        self.shown_col = [int(self.hue_bot.get()),0]
+            self.val_bot.delete(0, END)
+            self.val_bot.insert(0, Params[4])
+            self.val_top.delete(0, END)
+            self.val_top.insert(0, Params[5])
 
-        self.param_find_targets=Params_target
-        self.distance.set(Params[6])
+            self.shown_col = [int(self.hue_bot.get()),0]
 
-        if len(self.Images_names)>0:
-            self.canvas_main_img.name=self.Images_names[self.Current_img]
-            self.canvas_main_img.update_image(self.Images[self.Current_img])
-        else:
-            self.canvas_main_img.name="No image"
-            self.canvas_main_img.update_image(self.blank)
+            self.param_find_targets=Params_target
+            self.distance.set(Params[6])
 
-        self.update_show()
-        self.afficher_min()
-        self.update()
-        self.prepare_GUI_with_proj()
+            if len(self.Images_names)>0:
+                self.canvas_main_img.name=self.Images_names[self.Current_img]
+                self.canvas_main_img.update_image(self.Images[self.Current_img])
+            else:
+                self.canvas_main_img.name="No image"
+                self.canvas_main_img.update_image(self.blank)
 
-        self.canvas_main_img.bindings()
+            self.update_show()
+            self.afficher_min()
+            self.update()
+            self.prepare_GUI_with_proj()
+
+            self.canvas_main_img.bindings()
 
 
     def prepare_GUI_with_proj(self):
@@ -1356,39 +1378,71 @@ class Interface(Frame):
 
 
     def load_images(self,load_frame):
+        print("Load images")
         self.Images = []
         first = True
         compteur = -1
         count=0
+        self.do_not_open = False
+        print(self.Images_names)
+        directory=None
         if len(self.Images_names)>0:
-            for file in self.Images_names:
-                load_frame.show_load(0.5+0.5*(count/len(self.Images_names)))
-                compteur = compteur + 1
-                ImG = cv2.imread(file)
-                ImG = cv2.cvtColor(ImG, cv2.COLOR_BGR2RGB)
-                self.Images.append(ImG)
+            to_remove=[]
+            for img_id in range(len(self.Images_names)):
+                load_frame.show_load(0.5 + 0.5 * (count / len(self.Images_names)))
+                if not self.do_not_open:
+                    while not os.path.isfile(self.Images_names[img_id]):
+                        if not directory is None and os.path.isfile(os.path.join(directory,os.path.basename(self.Images_names[img_id]))):
+                            self.Images_names[img_id]=os.path.join(directory,os.path.basename(self.Images_names[img_id]))
+                        else:
+                            answer=tkinter.messagebox.askyesno("Missing image","The image {} is missing. Do you want to delete it?".format(self.Images_names[img_id]))
+                            if answer:
+                                to_remove.append(img_id)
+                                break
+                            else:
+                                answer2 = tkinter.messagebox.askyesno("Missing image", "Do you want to indicate a new path?")
+                                if answer2:
+                                    directory=tkinter.filedialog.askdirectory()
+                                    self.Images_names[img_id]=os.path.join(directory, os.path.basename(self.Images_names[img_id]))
 
-                min_width=400
+                                else:
+                                    self.do_not_open=True
+                                    break
 
-                if first:
-                    ImG = self.transfo_img(compteur)
-                    ratio=ImG.shape[1]/min_width
-                    ImG=cv2.resize(ImG,[min_width,int(ImG.shape[0]/ratio)])
-                    self.Miniature = ImG
-                    first = False
-                else:
-                    ImG = self.transfo_img(compteur)
-                    ratio=ImG.shape[1]/min_width
-                    ImG=cv2.resize(ImG,[min_width,int(ImG.shape[0]/ratio)])
-                    self.Miniature = np.concatenate((self.Miniature, ImG), axis=0)
-                count+=1
+                    if os.path.isfile(self.Images_names[img_id]) and not self.do_not_open:
+                        compteur = compteur + 1
+                        ImG = cv2.imread(self.Images_names[img_id])
+                        ImG = cv2.cvtColor(ImG, cv2.COLOR_BGR2RGB)
+                        self.Images.append(ImG)
 
-            self.Current_img = 0
-            self.SizeMin = self.Miniature.shape
-            self.cutted_Miniature = self.Miniature[0:250, 0:self.SizeMin[1]]
-            self.SizeMin_cut = self.cutted_Miniature.shape
-            self.scale_tool_size.configure(to=self.SizeMin[0] - 1)
-            self.afficher_min()
+                        min_width=400
+
+                        if first:
+                            ImG = self.transfo_img(compteur)
+                            ratio=ImG.shape[1]/min_width
+                            ImG=cv2.resize(ImG,[min_width,int(ImG.shape[0]/ratio)])
+                            self.Miniature = ImG
+                            first = False
+                        else:
+                            ImG = self.transfo_img(compteur)
+                            ratio=ImG.shape[1]/min_width
+                            ImG=cv2.resize(ImG,[min_width,int(ImG.shape[0]/ratio)])
+                            self.Miniature = np.concatenate((self.Miniature, ImG), axis=0)
+                        count+=1
+
+            if not self.do_not_open:
+                if len(to_remove) > 0:
+                    self.remove_selection(to_remove)
+                self.Current_img = 0
+                self.SizeMin = self.Miniature.shape
+                self.cutted_Miniature = self.Miniature[0:self.Can_Miniature_img.winfo_height(), 0:self.SizeMin[1]]
+                self.SizeMin_cut = self.cutted_Miniature.shape
+                self.scale_tool_size.configure(to=self.SizeMin[0] - 1)
+                self.afficher_min()
+            else:
+                self.close()
+
+
         load_frame.destroy()
 
     def automated_findings(self):
