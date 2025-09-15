@@ -804,7 +804,6 @@ class Interface(Frame):
         self.angle1 = -(float(HB) + 180) * math.pi / 180
         self.angle2 = -(float(HT) + 180) * math.pi / 180
 
-
         new_x = int((540 / 2) + ((245 / 2) * math.sin(self.angle1)))
         new_y = int((540 / 2) + ((245 / 2) * math.cos(self.angle1)))
         new_x2 = int((540 / 2) + (((245 + 154) / 2) * math.sin(self.angle1)))
@@ -1344,7 +1343,7 @@ class Interface(Frame):
             load_frame = Loading.Loading(self.frame_main)  # Progression bar
             load_frame.show_load(0)
 
-            Params=[self.hue_bot.get(), self.hue_top.get(), self.sat_bot.get(), self.sat_top.get(),self.val_bot.get(),self.val_top.get(),self.distance.get()]
+            Params=[self.hue_bot.get(), self.hue_top.get(), self.sat_bot.get(), self.sat_top.get(),self.val_bot.get(),self.val_top.get(),self.distance.get(), self.particle_erosion.get(), self.particle_dilation.get()]
             with open(self.file_project_save, 'wb') as fp:
                 pickle.dump((self.Datas_generales, self.Images_names, Params, self.param_find_targets), fp)
 
@@ -1403,6 +1402,13 @@ class Interface(Frame):
 
                 self.param_find_targets=Params_target
                 self.distance.set(Params[6])
+
+                try:
+                    self.particle_erosion.set(Params[7])
+                    self.particle_dilation.set(Params[8])
+                except:
+                    self.particle_erosion.set(0)
+                    self.particle_dilation.set(0)
 
                 if len(self.Images_names)>0:
                     self.canvas_main_img.name=self.Images_names[self.Current_img]
