@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-def find_particles(image,contours,target,hue,sat,val):
+def find_particles(image,contours,target,hue,sat,val,ero,dil):
     if not target is None:
         image_grey = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         target_mask = np.zeros_like(image_grey)
@@ -16,6 +16,13 @@ def find_particles(image,contours,target,hue,sat,val):
                 mask_low = cv2.inRange(img_hsv, np.array([hue[0], sat[0], val[0]]), np.array([180, sat[1], val[1]]))
                 mask_high = cv2.inRange(img_hsv, np.array([0, sat[0], val[0]]), np.array([hue[1], sat[1], val[1]]))
                 mask = cv2.bitwise_or(mask_low, mask_high)
+
+            if ero>0:
+                kernel = np.ones((3,3), np.uint8)
+                mask=cv2.erode(mask,kernel,iterations=ero)
+            if dil>0:
+                kernel = np.ones((3, 3), np.uint8)
+                mask = cv2.dilate(mask, kernel,iterations=dil)
 
             final_mask=cv2.bitwise_and(mask, target_mask)
 

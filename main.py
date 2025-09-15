@@ -70,11 +70,18 @@ class Interface(Frame):
         #Loading of the parameters that must remain always, independently from the projects (for now, only auto update exists)
         Param_file = User_loading.resource_path(os.path.join("Settings"))
         with open(Param_file, 'rb') as fp:
-            Params = pickle.load(fp)
+            Params_settings = pickle.load(fp)
 
         #If True, auto_update will recalculate the particles location of the image as soon as a modification is done.
         #Can be set to False to avoid computer to be slow (in that case, the user will need to hit the "Validate" button to update particles.
-        self.auto_update=Params[0]
+        self.auto_update=Params_settings["Auto_up"]
+
+        # Flag to determine whether all particles should be exported or not
+        try:
+            self.export_all_particles = Params_settings["Export_particles"]
+        except:
+            Params_settings["Export_particles"]=False
+            self.export_all_particles = False
 
         ## Parameters relative to the program
         self.project_open=False#Whether a project is opened (at initiation, no)
@@ -118,6 +125,15 @@ class Interface(Frame):
         self.optionsmenu = Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Options", menu=self.optionsmenu)
         self.optionsmenu.add_command(label=text, command=self.change_auto_part)
+
+        #The extraction of particles may be on or off. If on, all particles will be extracted when exporting the patrticles, which may be highly time consuming.
+        if self.export_all_particles:
+            text="Export all particles ✔"
+        else:
+            text="Export all particles"
+        self.optionsmenu.add_command(label=text, command=self.change_export_all_part)
+
+
         self.root.config(menu=self.menubar)
 
         # Bar informing about the mouse position and pixels characteristics under the cursor
@@ -307,13 +323,30 @@ class Interface(Frame):
                                          command=partial(self.empty_proj, redo=True))
         bouton_Reset.grid(row=0, column=3, rowspan=3, sticky="nswe")
 
+
+        Frame_dil_ero=Frame(self.canvas_choice_couleurs)
+        Frame_dil_ero.grid(row=3, column=0,columnspan=4, sticky="nsew")
+        Frame_dil_ero.columnconfigure(0,weight=1)
+        Frame_dil_ero.columnconfigure(1, weight=1)
+        self.particle_erosion=IntVar()
+        ero_scale = Scale(Frame_dil_ero, label="Erosion", from_=0, to=20, resolution=1,
+                                     orient=HORIZONTAL, length=75, variable=self.particle_erosion, command=self.validate)
+        ero_scale.grid(row=0, column=0, sticky="ew")
+
+        self.particle_dilation=IntVar()
+        dil_scale = Scale(Frame_dil_ero, label="Dilation", from_=0, to=20, resolution=1,
+                                     orient=HORIZONTAL, length=75, variable=self.particle_dilation, command=self.validate)
+        dil_scale.grid(row=0, column=1, sticky="ew")
+
         #Under the manual entries, we have a validate button which will confirm entries values and update the currrent image display
         bouton_Valider = Button(self.canvas_choice_couleurs, text="Validate", fg="white", bg="green", command=partial(self.update_show, True))
-        bouton_Valider.grid(row=3, column=0, columnspan=2, sticky="nswe")
+        bouton_Valider.grid(row=4, column=0, columnspan=2, sticky="nswe")
         #A "validate all" button is here to apply these parameters to all the images of the project
         bouton_Valider_all = Button(self.canvas_choice_couleurs, text="Validate all", fg="white", bg="orange",
                                          command=self.validate_all)
-        bouton_Valider_all.grid(row=3, column=2, columnspan=2, sticky="nswe")
+        bouton_Valider_all.grid(row=4, column=2, columnspan=2, sticky="nswe")
+
+
 
 
         ##Bellow the color selection, we find the Tool informations. The tool is how the user interact with the current image
@@ -322,9 +355,10 @@ class Interface(Frame):
 
         #The tool size can be changed
         self.scale_tool_size = Scale(self.Frame_Tool_param, label="Tool size", from_=3, to=500, resolution=1,
-                                     orient=HORIZONTAL, length=200, command=self.Change_tool_size)
+                                     orient=HORIZONTAL, length=100, command=self.Change_tool_size)
         self.scale_tool_size.grid(row=0, column=2)
         self.scale_tool_size.set(50)
+
 
         #The tool can either increase the selection area ("Add"), or decrease it ("Remove")
         Add = Radiobutton(self.Frame_Tool_param, text="Add", indicatoron=0, width=10, variable=self.tool_add,
@@ -388,7 +422,10 @@ class Interface(Frame):
 
         #We finally prepare the project
         self.empty_proj() # This function is used at initiation and later to close projects
-        self.shown_col = [int(self.hue_bot.get()), 0]        # Variable keeping the hue value to be displayed and corresponding Y position in "self.canvas_img_hue"
+        try:
+            self.shown_col = [int(self.hue_bot.get()), 0]        # Variable keeping the hue value to be displayed and corresponding Y position in "self.canvas_img_hue"
+        except:
+            self.shown_col = [0, 0]
         self.update()
         self.update_show() # Update the canvas to show colors
 
@@ -434,8 +471,25 @@ class Interface(Frame):
         #We update the programs settings accordingly so it will remember user choice
         Param_file = User_loading.resource_path(os.path.join("Settings"))
         with open(Param_file, 'wb') as fp:
-            pickle.dump([self.auto_update], fp)
+            pickle.dump({"Auto_up":self.auto_update,"Export_particles":self.export_all_particles}, fp)
 
+
+    def change_export_all_part(self):
+        '''This function change the export all particles option mode from activated to disabled. If on, when extracting particles every independant particle will be saved.
+        If off (savec computer power), only the target and "All_particles" will be saved'''
+        self.export_all_particles= not self.export_all_particles #Flag for on/off
+
+        #Update visual of the menubar
+        if self.export_all_particles:
+            text="Export all particles ✔"
+        else:
+            text="Export all particles"
+        self.optionsmenu.entryconfig(1, label=text)
+
+        #We update the programs settings accordingly so it will remember user choice
+        Param_file = User_loading.resource_path(os.path.join("Settings"))
+        with open(Param_file, 'wb') as fp:
+            pickle.dump({"Auto_up":self.auto_update,"Export_particles":self.export_all_particles}, fp)
 
     def empty_proj(self, redo=False):
         '''Change the values for when there is no project open
@@ -443,19 +497,21 @@ class Interface(Frame):
         #Minimum values everywhere
         # Hue
         self.hue_bot.delete(0, END)
-        self.hue_bot.insert(0, "0")
+        self.hue_bot.insert(0, "NA")
         self.hue_top.delete(0, END)
-        self.hue_top.insert(0, "1")
+        self.hue_top.insert(0, "NA")
         # Saturation
         self.sat_bot.delete(0, END)
-        self.sat_bot.insert(0, "0")
+        self.sat_bot.insert(0, "NA")
         self.sat_top.delete(0, END)
-        self.sat_top.insert(0, "0")
+        self.sat_top.insert(0, "NA")
         # Value
         self.val_bot.delete(0, END)
-        self.val_bot.insert(0, "0")
+        self.val_bot.insert(0, "NA")
         self.val_top.delete(0, END)
-        self.val_top.insert(0, "0")
+        self.val_top.insert(0, "NA")
+
+
 
         if not redo:#If redo, we reset all values, of not we keep the previous scale values
             self.Entry_dist.delete(0, END)
@@ -695,19 +751,29 @@ class Interface(Frame):
         else:
             self.tool_add.set(type)
 
-    def validate(self):
+    def validate(self, *args):
         if len(self.Images) > 0:
             self.Datas_generales[self.Current_img]["Particles"]=[]
             for target in range(len(self.Datas_generales[self.Current_img]["Target"][0])):
                 if self.Datas_generales[self.Current_img]["Target"][1][0][target][3] == -1:
-                    self.Datas_generales[self.Current_img]["Particles"].append(Fun.find_particles(self.Images[self.Current_img],
-                                                                         self.Datas_generales[self.Current_img]["Target"],target, (
-                                                                         int(float(self.hue_bot.get()) / 2),
-                                                                         int(float(self.hue_top.get()) / 2)), (
-                                                                         (int(float(self.sat_bot.get()))),
-                                                                         int(float(self.sat_top.get()))), (
-                                                                         int(float(self.val_bot.get())),
-                                                                         int(float(self.val_top.get())))))
+                    try:
+                        float(self.hue_bot.get())
+                        float(self.hue_top.get())
+                        float(self.sat_bot.get())
+                        float(self.sat_top.get())
+                        float(self.val_bot.get())
+                        float(self.val_top.get())
+                        self.Datas_generales[self.Current_img]["Particles"].append(Fun.find_particles(self.Images[self.Current_img],
+                                                                             self.Datas_generales[self.Current_img]["Target"],target, (
+                                                                             int(float(self.hue_bot.get()) / 2),
+                                                                             int(float(self.hue_top.get()) / 2)), (
+                                                                             (int(float(self.sat_bot.get()))),
+                                                                             int(float(self.sat_top.get()))), (
+                                                                             int(float(self.val_bot.get())),
+                                                                             int(float(self.val_top.get()))),
+                                                                                self.particle_erosion.get(),self.particle_dilation.get()))
+                    except:
+                        pass
             self.modif_image()
         self.update()
 
@@ -716,12 +782,18 @@ class Interface(Frame):
             self.validate()
         Size = self.img_colors.shape
 
-        if int(self.hue_bot.get()) < int(self.hue_top.get()):
-            if not ((self.shown_col[0])>=int(self.hue_bot.get()) and (self.shown_col[0])<=int(self.hue_top.get())):
-                self.shown_col=[int(self.hue_bot.get()),0]
-        else:
-            if ((self.shown_col[0])>=int(self.hue_bot.get()) and (self.shown_col[0])<=int(self.hue_top.get())):
-                self.shown_col=[int(self.hue_bot.get()),0]
+        try:
+            HB=int(self.hue_bot.get())
+            HT=int(self.hue_top.get())
+        except:
+            HB=0
+            HT=0
+
+        if HB < HT:
+            if not ((self.shown_col[0])>=HB and (self.shown_col[0])<=HT):
+                self.shown_col=[HB,0]
+        elif ((self.shown_col[0])>=HB and (self.shown_col[0])<=HT):
+                self.shown_col=[HB,0]
 
         self.img_colors_new = np.copy(self.img_colors)
         self.img_colors_new_r = cv2.resize(self.img_colors_new, (int(Size[1] * self.ratio_col), int(Size[0] * self.ratio_col)))
@@ -729,8 +801,9 @@ class Interface(Frame):
 
 
         # Display color chart
-        self.angle1 = -(float(self.hue_bot.get()) + 180) * math.pi / 180
-        self.angle2 = -(float(self.hue_top.get()) + 180) * math.pi / 180
+        self.angle1 = -(float(HB) + 180) * math.pi / 180
+        self.angle2 = -(float(HT) + 180) * math.pi / 180
+
 
         new_x = int((540 / 2) + ((245 / 2) * math.sin(self.angle1)))
         new_y = int((540 / 2) + ((245 / 2) * math.cos(self.angle1)))
@@ -745,18 +818,18 @@ class Interface(Frame):
         cv2.line(self.img_colors_new, (new_x, new_y), (new_x2, new_y2), (0, 0, 0), 4)
 
         self.img_colors_new = cv2.cvtColor(self.img_colors_new, cv2.COLOR_BGR2RGB)
-        if float(self.hue_bot.get()) < float(self.hue_top.get()):
+        if HB < HT:
             self.img_colors_new = cv2.ellipse(self.img_colors_new, (int(540 / 2), int(540 / 2)),
                                               (int((245 + 200) / 2), int((245 + 200) / 2)), 0,
-                                              int((float(self.hue_bot.get()) - 90)),
-                                              int((float(self.hue_top.get()) - 90)), (20, 0, 20), 4)
+                                              int((float(HB) - 90)),
+                                              int((float(HT) - 90)), (20, 0, 20), 4)
         else:
             self.img_colors_new = cv2.ellipse(self.img_colors_new, (int(540 / 2), int(540 / 2)),
                                               (int((245 + 200) / 2), int((245 + 200) / 2)), 0,
-                                              int((float(self.hue_bot.get()) - 90)), 360 - 90, (20, 0, 20), 4)
+                                              int((float(HB) - 90)), 360 - 90, (20, 0, 20), 4)
             self.img_colors_new = cv2.ellipse(self.img_colors_new, (int(540 / 2), int(540 / 2)),
                                               (int((245 + 200) / 2), int((245 + 200) / 2)), 0, 360 - 90,
-                                              int((float(self.hue_top.get()) - 90)) + 360, (20, 0, 20), 4)
+                                              int((float(HT) - 90)) + 360, (20, 0, 20), 4)
 
         self.TMP_img_col = cv2.resize(self.img_colors_new, (int(Size[1] * self.ratio_col), int(Size[0] * self.ratio_col)))
         self.col_show = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.TMP_img_col))
@@ -765,18 +838,30 @@ class Interface(Frame):
         self.canvas_img_couleurs.itemconfig(self.can_col, image=self.col_show)
 
         #Display saturation chart
+        try:
+            SB=int(self.sat_bot.get())
+            ST=int(self.sat_top.get())
+        except:
+            SB=0
+            ST=0
         saturations=self.saturations.copy()
-        self.sat3=cv2.line(saturations, (0,int(self.sat_bot.get())),(int(self.canvas_img_sat.winfo_width()),int(self.sat_bot.get())),(200,200,200),2)
-        self.sat3 = cv2.line(saturations, (0, int(self.sat_top.get())),(int(self.canvas_img_sat.winfo_width()), int(self.sat_top.get())), (50, 50, 50), 2)
+        self.sat3=cv2.line(saturations, (0,SB),(int(self.canvas_img_sat.winfo_width()),SB),(200,200,200),2)
+        self.sat3 = cv2.line(saturations, (0, ST),(int(self.canvas_img_sat.winfo_width()), ST), (50, 50, 50), 2)
         self.sat3=cv2.resize(self.sat3,(int(self.canvas_img_sat.winfo_width()),int(self.canvas_img_val.winfo_height())))
         self.sat_ratio=int(self.canvas_img_sat.winfo_height())/self.saturations.shape[0]
         self.sat4 = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.sat3))
         self.canvas_img_sat.create_image(0,0, image=self.sat4, anchor=NW)
 
         #Display value chart
+        try:
+            VB=int(self.val_bot.get())
+            VT=int(self.val_top.get())
+        except:
+            VB=0
+            VT=0
         values=self.values.copy()
-        self.val3=cv2.line(values, (0,int(self.val_bot.get())),(int(self.canvas_img_val.winfo_width()),int(self.val_bot.get())),(200,200,200),2)
-        self.val3 = cv2.line(values, (0, int(self.val_top.get())),(int(self.canvas_img_val.winfo_width()), int(self.val_top.get())), (50, 50, 50), 2)
+        self.val3=cv2.line(values, (0,VB),(int(self.canvas_img_val.winfo_width()),VB),(200,200,200),2)
+        self.val3 = cv2.line(values, (0, VT),(int(self.canvas_img_val.winfo_width()), VT), (50, 50, 50), 2)
         self.val3=cv2.resize(self.val3,(int(self.canvas_img_val.winfo_width()),int(self.canvas_img_val.winfo_height())))
         self.val_ratio=int(self.canvas_img_val.winfo_height())/self.values.shape[0]
         self.val4 = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.val3))
@@ -784,12 +869,12 @@ class Interface(Frame):
 
 
         #Selected colors
-        bgr=display_colors.create_sat_val(self.shown_col[0],int(self.sat_bot.get()),int(self.sat_top.get()),int(self.val_bot.get()),int(self.val_top.get()))
+        bgr=display_colors.create_sat_val(self.shown_col[0],SB,ST,VB,VT)
         self.bgr=cv2.resize(bgr,(int(self.canvas_img_saturation_value.winfo_width()),int(self.canvas_img_saturation_value.winfo_height())))
         self.bgr2 = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.bgr))
         self.canvas_img_saturation_value.create_image(0,0, image=self.bgr2, anchor=NW)
 
-        himg=display_colors.create_hue(int(self.hue_bot.get()),int(self.hue_top.get()))
+        himg=display_colors.create_hue(HB,HT)
         self.bgr3=cv2.resize(himg,(int(self.canvas_img_hue.winfo_width()),int(self.canvas_img_hue.winfo_height())))
         self.bgrX=self.bgr3.copy()
         self.bgr3=cv2.rectangle(self.bgr3, (0,self.shown_col[1]-1),(int(self.canvas_img_hue.winfo_width()-1),self.shown_col[1]+1),(150,150,150),1)
@@ -797,9 +882,6 @@ class Interface(Frame):
         self.canvas_img_hue.create_image(0,0, image=self.bgr4, anchor=NW)
         self.canvas_img_hue.bind("<Button-1>",self.select_col)
         self.canvas_img_hue.bind("<B1-Motion>", self.select_col)
-
-
-
 
 
 
@@ -815,13 +897,19 @@ class Interface(Frame):
             self.sat_bot.delete(0, END)
             self.sat_bot.insert(0, str(new_val))
 
-        if int(self.sat_bot.get()) > int(self.sat_top.get()):
-            nbot = self.sat_top.get()
-            ntop = self.sat_bot.get()
-            self.sat_top.delete(0, END)
-            self.sat_top.insert(0, ntop)
-            self.sat_bot.delete(0, END)
-            self.sat_bot.insert(0, nbot)
+        try:
+            int(self.sat_bot.get())
+            int(self.sat_top.get())
+            if int(self.sat_bot.get()) > int(self.sat_top.get()):
+                nbot = self.sat_top.get()
+                ntop = self.sat_bot.get()
+                self.sat_top.delete(0, END)
+                self.sat_top.insert(0, ntop)
+                self.sat_bot.delete(0, END)
+                self.sat_bot.insert(0, nbot)
+        except:
+            pass
+
 
         self.update_show()
 
@@ -863,13 +951,19 @@ class Interface(Frame):
             self.val_bot.delete(0, END)
             self.val_bot.insert(0, str(new_val))
 
-        if int(self.val_bot.get())>int(self.val_top.get()):
-            nbot=self.val_top.get()
-            ntop=self.val_bot.get()
-            self.val_top.delete(0, END)
-            self.val_top.insert(0, ntop)
-            self.val_bot.delete(0, END)
-            self.val_bot.insert(0, nbot)
+        try:
+            int(self.val_bot.get())
+            int(self.val_top.get())
+
+            if int(self.val_bot.get())>int(self.val_top.get()):
+                nbot=self.val_top.get()
+                ntop=self.val_bot.get()
+                self.val_top.delete(0, END)
+                self.val_top.insert(0, ntop)
+                self.val_bot.delete(0, END)
+                self.val_bot.insert(0, nbot)
+        except:
+            pass
 
 
         self.update_show()
@@ -920,38 +1014,11 @@ class Interface(Frame):
     def validate_all(self):
         load_frame = Loading.Loading(self.frame_main)  # Progression bar
         load_frame.show_load(0)
+        self.validate()
+
         Size = self.img_colors.shape
         self.img_colors_new = np.copy(self.img_colors)
         self.img_colors_new_r = cv2.resize(self.img_colors_new, (int(Size[1] * 0.5), int(Size[0] * 0.5)))
-
-        self.angle1 = -(float(self.hue_bot.get()) + 180) * math.pi / 180
-        self.angle2 = -(float(self.hue_top.get()) + 180) * math.pi / 180
-
-        new_x = int((540 / 2) + ((245 / 2) * math.sin(self.angle1)))
-        new_y = int((540 / 2) + ((245 / 2) * math.cos(self.angle1)))
-        new_x2 = int((540 / 2) + (((245 + 154) / 2) * math.sin(self.angle1)))
-        new_y2 = int((540 / 2) + (((245 + 154) / 2) * math.cos(self.angle1)))
-        cv2.line(self.img_colors_new, (new_x, new_y), (new_x2, new_y2), (255, 255, 255), 4)
-
-        new_x = int((540 / 2) + ((245 / 2) * math.sin(self.angle2)))
-        new_y = int((540 / 2) + ((245 / 2) * math.cos(self.angle2)))
-        new_x2 = int((540 / 2) + (((245 + 154) / 2) * math.sin(self.angle2)))
-        new_y2 = int((540 / 2) + (((245 + 154) / 2) * math.cos(self.angle2)))
-        cv2.line(self.img_colors_new, (new_x, new_y), (new_x2, new_y2), (0, 0, 0), 4)
-
-        self.img_colors_new = cv2.cvtColor(self.img_colors_new, cv2.COLOR_BGR2RGB)
-        if float(self.hue_bot.get()) < float(self.hue_top.get()):
-            self.img_colors_new = cv2.ellipse(self.img_colors_new, (int(540 / 2), int(540 / 2)),
-                                              (int((245 + 200) / 2), int((245 + 200) / 2)), 0,
-                                              int((float(self.hue_bot.get()) - 90)),
-                                              int((float(self.hue_top.get()) - 90)), (20, 0, 20), 4)
-        else:
-            self.img_colors_new = cv2.ellipse(self.img_colors_new, (int(540 / 2), int(540 / 2)),
-                                              (int((245 + 200) / 2), int((245 + 200) / 2)), 0,
-                                              int((float(self.hue_bot.get()) - 90)), 360 - 90, (20, 0, 20), 4)
-            self.img_colors_new = cv2.ellipse(self.img_colors_new, (int(540 / 2), int(540 / 2)),
-                                              (int((245 + 200) / 2), int((245 + 200) / 2)), 0, 360 - 90,
-                                              int((float(self.hue_top.get()) - 90)) + 360, (20, 0, 20), 4)
 
         self.TMP_img_col = cv2.resize(self.img_colors_new, (int(Size[1] * self.ratio_col), int(Size[0] * self.ratio_col)))
         self.col_show = PIL.ImageTk.PhotoImage(image=PIL.Image.fromarray(self.TMP_img_col))
@@ -959,24 +1026,36 @@ class Interface(Frame):
         self.canvas_img_couleurs.config(width=int(Size[1] * self.ratio_col), height=int(Size[0] * self.ratio_col))
         self.canvas_img_couleurs.itemconfig(self.can_col, image=self.col_show)
 
-
         if len(self.Images) > 0:
             for img in range(len(self.Datas_generales)):
-                load_frame.show_load(img/len(self.Datas_generales))
-                self.Datas_generales[img]["Particles"]=[]
+                load_frame.show_load(img / len(self.Datas_generales))
+                self.Datas_generales[img]["Particles"] = []
 
-                for target in range(len(self.Datas_generales[img]["Target"][1][0])):
-                    if self.Datas_generales[img]["Target"][1][0][target][3] == -1:
-                        self.Datas_generales[img]["Particles"].append( Fun.find_particles(self.Images[img], self.Datas_generales[img]["Target"],target, (
-                        int(float(self.hue_bot.get()) / 2), int(float(self.hue_top.get()) / 2)), (
-                                                                     (int(float(self.sat_bot.get()))),
-                                                                     int(float(self.sat_top.get()))), (
-                                                                     int(float(self.val_bot.get())),
-                                                                     int(float(self.val_top.get())))))
-            self.afficher_min()
-            self.modif_image()
+                try:
+                    float(self.hue_bot.get())
+                    float(self.hue_top.get())
+                    float(self.sat_bot.get())
+                    float(self.sat_top.get())
+                    float(self.val_bot.get())
+                    float(self.val_top.get())
+                    for target in range(len(self.Datas_generales[img]["Target"][1][0])):
+                        if self.Datas_generales[img]["Target"][1][0][target][3] == -1:
+                            self.Datas_generales[img]["Particles"].append( Fun.find_particles(self.Images[img], self.Datas_generales[img]["Target"],target, (
+                            int(float(self.hue_bot.get()) / 2), int(float(self.hue_top.get()) / 2)), (
+                                                                         (int(float(self.sat_bot.get()))),
+                                                                         int(float(self.sat_top.get()))), (
+                                                                         int(float(self.val_bot.get())),
+                                                                         int(float(self.val_top.get()))),
+                                                                                self.particle_erosion.get(),self.particle_dilation.get()))
+
+                except:
+                    pass
+
+        self.afficher_min()
+        self.modif_image()
         self.update()
         load_frame.destroy()
+
 
     def move_col(self, event):
         rgb = np.uint8([[self.img_colors_new_r[event.y, event.x]]])  # shape: (1,1,3)
@@ -1029,7 +1108,14 @@ class Interface(Frame):
             hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)[0, 0]
             hsv=np.uint16(hsv)
 
-            if abs(int(self.hue_bot.get())-int(self.hue_top.get()))<=1:
+            try:
+                int(self.hue_bot.get())
+                int(self.hue_top.get())
+                values = True
+            except:
+                values = False
+
+            if not values:
                 new_bot=(hsv[0] * 2)-2
                 if new_bot<0:
                     new_bot=360-new_bot
@@ -1074,7 +1160,14 @@ class Interface(Frame):
                         self.hue_top.insert(0, str(hsv[0]*2))
 
             #Change Sat:
-            if abs(int(self.sat_bot.get())-int(self.sat_top.get()))<=1:
+            try:
+                int(self.sat_bot.get())
+                int(self.sat_top.get())
+                values = True
+            except:
+                values = False
+
+            if not values:
                 self.sat_bot.delete(0, END)
                 self.sat_bot.insert(0, str(max(0,hsv[1]-1)))
 
@@ -1089,7 +1182,14 @@ class Interface(Frame):
                     self.sat_top.insert(0, str(hsv[1]))
 
             #Change Val:
-            if abs(int(self.val_bot.get()) - int(self.val_top.get())) <= 1:
+            try:
+                int(self.val_bot.get())
+                int(self.val_top.get())
+                values = True
+            except:
+                values = False
+
+            if not values:
                 self.val_bot.delete(0, END)
                 self.val_bot.insert(0, str(max(0, hsv[2] - 1)))
 
@@ -1279,7 +1379,6 @@ class Interface(Frame):
             load_frame.destroy()
 
             if not self.do_not_open:
-
                 self.hue_bot.delete(0, END)
                 self.hue_bot.insert(0, Params[0])
                 self.hue_top.delete(0, END)
@@ -1295,7 +1394,12 @@ class Interface(Frame):
                 self.val_top.delete(0, END)
                 self.val_top.insert(0, Params[5])
 
-                self.shown_col = [int(self.hue_bot.get()),0]
+                try:
+                    self.shown_col = self.shown_col = [int(self.hue_bot.get()),0] # Variable keeping the hue value to be displayed and corresponding Y position in "self.canvas_img_hue"
+                except:
+                    self.shown_col = [0, 0]
+
+
 
                 self.param_find_targets=Params_target
                 self.distance.set(Params[6])
@@ -1525,7 +1629,8 @@ class Interface(Frame):
             self.root.protocol("WM_DELETE_WINDOW", self.quit_danger)
             Extracting_particles.save_particles(self.frame_main, self.Datas_generales, self.distance, self.Images)
             self.root.protocol("WM_DELETE_WINDOW", self.quit)
-        except:
+        except Exception as e:
+            print(e)
             self.root.protocol("WM_DELETE_WINDOW", self.quit)
 
 window = Tk()
