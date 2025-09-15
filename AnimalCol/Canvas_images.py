@@ -1,11 +1,7 @@
 from tkinter import *
-import numpy as np
 import cv2
-import time
 import PIL.Image, PIL.ImageTk
 import os
-import math
-from PIL import ImageFont, ImageDraw, Image
 import copy
 
 

@@ -3,11 +3,12 @@ import numpy as np
 import cv2
 import math
 import csv
-import AnimalCol.Loading as Loading
 from scipy.stats import circmean
-import AnimalCol.User_loading as User_loading
 import pickle
 import os
+
+import AnimalCol.Loading as Loading
+import AnimalCol.User_loading as User_loading
 
 def save_particles(load_frame, Datas_generales, distance, Images):
     # Loading of the parameters that must remain always, independently from the projects (for now, only auto update exists)

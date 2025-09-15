@@ -1,5 +1,3 @@
-from os import stat_result
-from scipy.stats.contingency import crosstab
 from tkinter import *
 import PIL
 import PIL.ImageTk, PIL.Image
@@ -9,8 +7,7 @@ import math
 from scipy.interpolate import splprep, splev
 import os
 
-
-import Loading
+import AnimalCol.Loading as Loading
 
 class Auto_param_interface(Frame):
     """ This is a small Frame in which the user can define the nomber of targets per arena, in the case the number is variable between arenas."""

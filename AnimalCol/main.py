@@ -5,19 +5,19 @@ import numpy as np
 import cv2
 import PIL.Image, PIL.ImageTk
 import math
-import Extracting_particles
-import Functions_find_red as Fun
 import os
 import pickle
-import Loading
-import display_colors
 import imghdr
-import User_loading
-import Auto_detection
-import Vid_list
 from functools import partial
-import Canvas_images
-from scipy.stats import circmean
+
+import AnimalCol.display_colors as display_colors
+import AnimalCol.Loading as Loading
+import AnimalCol.Canvas_images as Canvas_images
+import AnimalCol.User_loading as User_loading
+import AnimalCol.Auto_detection as Auto_detection
+import AnimalCol.Vid_list as Vid_list
+import AnimalCol.Extracting_particles as Extracting_particles
+import AnimalCol.Functions_find_red as Fun
 
 
 
