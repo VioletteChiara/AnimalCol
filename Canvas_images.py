@@ -26,7 +26,7 @@ class Image_show(Frame):
         self.no_zoom=False
         self.name=name
 
-        self.canvas_video = Canvas(self, highlightthickness=0, borderwidth=0, background="pink")
+        self.canvas_video = Canvas(self, highlightthickness=0, borderwidth=0)
         self.canvas_video.grid(row=0, column=0, sticky="nsew")
         Grid.columnconfigure(self, 0, weight=1)
         Grid.rowconfigure(self, 0, weight=1)

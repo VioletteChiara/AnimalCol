@@ -105,22 +105,22 @@ class Auto_param_interface(Frame):
 
 
         #List of videos
-        Video_list = Frame(self)
-        Grid.columnconfigure(Video_list, 0, weight=1)
-        Grid.rowconfigure(Video_list, 0, weight=1)  # Make row 1 expandable for the canvas
-        Grid.rowconfigure(Video_list, 1, weight=1)  # Make row 1 expandable for the canvas
-        Grid.rowconfigure(Video_list, 2, weight=100)  # Make row 1 expandable for the canvas
-        Grid.rowconfigure(Video_list, 3, weight=1)  # Make row 1 expandable for the canvas
-        Video_list.grid(row=2, column=1, sticky="nsew")
+        Image_list = Frame(self)
+        Grid.columnconfigure(Image_list, 0, weight=1)
+        Grid.rowconfigure(Image_list, 0, weight=1)  # Make row 1 expandable for the canvas
+        Grid.rowconfigure(Image_list, 1, weight=1)  # Make row 1 expandable for the canvas
+        Grid.rowconfigure(Image_list, 2, weight=100)  # Make row 1 expandable for the canvas
+        Grid.rowconfigure(Image_list, 3, weight=1)  # Make row 1 expandable for the canvas
+        Image_list.grid(row=2, column=1, sticky="nsew")
 
-        Label(Video_list, text="Videos", font=("Arial", 18), background="Royalblue").grid(row=0, column=0, columnspan=2, sticky="nsew")
-        Button(Video_list, text="Select all", command=self.select_all).grid(row=1, column=0, columnspan=2, sticky="nsew")
+        Label(Image_list, text="Images", font=("Arial", 18), background="Royalblue").grid(row=0, column=0, columnspan=2, sticky="nsew")
+        Button(Image_list, text="Select all", command=self.select_all).grid(row=1, column=0, columnspan=2, sticky="nsew")
 
         # Create canvas and scrollbar
-        Canvas_liste = Canvas(Video_list, width=300, height=150)
+        Canvas_liste = Canvas(Image_list, width=300, height=150)
         Canvas_liste.grid(row=2, column=0, sticky="nsew")
 
-        scrollbar = Scrollbar(Video_list, orient="vertical", command=Canvas_liste.yview)
+        scrollbar = Scrollbar(Image_list, orient="vertical", command=Canvas_liste.yview)
         scrollbar.grid(row=2, column=1, sticky="ns")
 
         Canvas_liste.configure(yscrollcommand=scrollbar.set)
@@ -139,7 +139,7 @@ class Auto_param_interface(Frame):
             chk.grid(row=pos_row, column=0, sticky="w")
 
         self.vid_buttons[curr_vid].set(True)
-        Button(Video_list, text="Validate", font=("Arial", 18), background="green", command=self.validate).grid(row=3, column=0, columnspan=2, sticky="nsew")
+        Button(Image_list, text="Validate", font=("Arial", 18), background="green", command=self.validate).grid(row=3, column=0, columnspan=2, sticky="nsew")
 
         # Update scrollregion when the frame changes size
         def on_frame_configure(event):

@@ -392,7 +392,24 @@ class Interface(Frame):
         self.update()
         self.update_show() # Update the canvas to show colors
 
+        #Adaptability of the GUI
         self.bind("<Configure>", self.update_size_min)
+
+        # Disable close button to avoid mistake
+        self.root.protocol("WM_DELETE_WINDOW", self.quit)
+
+    def quit(self):
+        if self.project_open:
+            answer = tkinter.messagebox.askyesnocancel("Warning",
+                                                       "The current project will be closed, do you want to save it before?")
+
+            if not answer is None:
+                if answer:
+                    self.save()
+                self.root.destroy()
+
+    def quit_danger(self):
+        tkinter.messagebox.showerror("Please wait", "Saving in progress. You cannot close the program right now.")
 
 
     def update_size_min(self, *args):
@@ -1156,13 +1173,19 @@ class Interface(Frame):
 
 
     def close(self):
-        self.projectmenu.entryconfig(2, state="disabled")
-        self.projectmenu.entryconfig(3, state="disabled")
-        self.projectmenu.entryconfig(4, state="disabled")
+        answer = tkinter.messagebox.askyesnocancel("Warning",
+                                                   "The current project will be closed, do you want to save it before?")
 
-        self.prepare_GUI_without_proj()
+        if not answer is None:
+            if answer:
+                self.save()
+            self.projectmenu.entryconfig(2, state="disabled")
+            self.projectmenu.entryconfig(3, state="disabled")
+            self.projectmenu.entryconfig(4, state="disabled")
 
-        self.project_open=False
+            self.prepare_GUI_without_proj()
+
+            self.project_open=False
 
 
 
@@ -1216,67 +1239,85 @@ class Interface(Frame):
             pass
 
     def save(self, *args):
-        Params=[self.hue_bot.get(), self.hue_top.get(), self.sat_bot.get(), self.sat_top.get(),self.val_bot.get(),self.val_top.get(),self.distance.get()]
-        with open(self.file_project_save, 'wb') as fp:
-            pickle.dump((self.Datas_generales, self.Images_names, Params, self.param_find_targets), fp)
+        try:
+            self.root.protocol("WM_DELETE_WINDOW", self.quit_danger)
+            load_frame = Loading.Loading(self.frame_main)  # Progression bar
+            load_frame.show_load(0)
+
+            Params=[self.hue_bot.get(), self.hue_top.get(), self.sat_bot.get(), self.sat_top.get(),self.val_bot.get(),self.val_top.get(),self.distance.get()]
+            with open(self.file_project_save, 'wb') as fp:
+                pickle.dump((self.Datas_generales, self.Images_names, Params, self.param_find_targets), fp)
+
+            load_frame.show_load(100)
+            load_frame.destroy()
+            self.root.protocol("WM_DELETE_WINDOW", self.quit)
+        except:
+            self.root.protocol("WM_DELETE_WINDOW", self.quit)
 
     def save_as(self):
-        self.file_project_save = filedialog.asksaveasfilename(defaultextension=".rfd")
-        self.root.title(os.path.basename(self.file_project_save)[0:-4] + " - ColCal")
+        self.file_project_save = filedialog.asksaveasfilename(defaultextension=".acl")
+        self.root.title(os.path.basename(self.file_project_save)[0:-4] + " - AnimalCol")
         self.save()
 
     def open_file(self):
-        self.canvas_main_img.unbindings()
+        answer=False
+        if self.project_open:
+            answer = tkinter.messagebox.askyesnocancel("Warning","The current project will be closed, do you want to save it before?")
+        if not answer is None:
+            if answer:
+                self.save()
 
-        self.file_project_save = filedialog.askopenfilename()
-        with open(self.file_project_save, 'rb') as fp:
-            self.Datas_generales, self.Images_names, Params, Params_target = pickle.load(fp)
+            self.canvas_main_img.unbindings()
 
-        load_frame = Loading.Loading(self.frame_main)  # Progression bar
-        load_frame.show_load(0)
-        self.load_images(load_frame)
-        load_frame.destroy()
+            self.file_project_save = filedialog.askopenfilename()
+            with open(self.file_project_save, 'rb') as fp:
+                self.Datas_generales, self.Images_names, Params, Params_target = pickle.load(fp)
 
-        if not self.do_not_open:
+            load_frame = Loading.Loading(self.frame_main)  # Progression bar
+            load_frame.show_load(0)
+            self.load_images(load_frame)
+            load_frame.destroy()
 
-            self.hue_bot.delete(0, END)
-            self.hue_bot.insert(0, Params[0])
-            self.hue_top.delete(0, END)
-            self.hue_top.insert(0, Params[1])
+            if not self.do_not_open:
 
-            self.sat_bot.delete(0, END)
-            self.sat_bot.insert(0, Params[2])
-            self.sat_top.delete(0, END)
-            self.sat_top.insert(0, Params[3])
+                self.hue_bot.delete(0, END)
+                self.hue_bot.insert(0, Params[0])
+                self.hue_top.delete(0, END)
+                self.hue_top.insert(0, Params[1])
 
-            self.val_bot.delete(0, END)
-            self.val_bot.insert(0, Params[4])
-            self.val_top.delete(0, END)
-            self.val_top.insert(0, Params[5])
+                self.sat_bot.delete(0, END)
+                self.sat_bot.insert(0, Params[2])
+                self.sat_top.delete(0, END)
+                self.sat_top.insert(0, Params[3])
 
-            self.shown_col = [int(self.hue_bot.get()),0]
+                self.val_bot.delete(0, END)
+                self.val_bot.insert(0, Params[4])
+                self.val_top.delete(0, END)
+                self.val_top.insert(0, Params[5])
 
-            self.param_find_targets=Params_target
-            self.distance.set(Params[6])
+                self.shown_col = [int(self.hue_bot.get()),0]
 
-            if len(self.Images_names)>0:
-                self.canvas_main_img.name=self.Images_names[self.Current_img]
-                self.canvas_main_img.update_image(self.Images[self.Current_img])
-            else:
-                self.canvas_main_img.name="No image"
-                self.canvas_main_img.update_image(self.blank)
+                self.param_find_targets=Params_target
+                self.distance.set(Params[6])
 
-            self.update_show()
-            self.afficher_min()
-            self.update()
-            self.prepare_GUI_with_proj()
+                if len(self.Images_names)>0:
+                    self.canvas_main_img.name=self.Images_names[self.Current_img]
+                    self.canvas_main_img.update_image(self.Images[self.Current_img])
+                else:
+                    self.canvas_main_img.name="No image"
+                    self.canvas_main_img.update_image(self.blank)
 
-            self.canvas_main_img.bindings()
+                self.update_show()
+                self.afficher_min()
+                self.update()
+                self.prepare_GUI_with_proj()
+
+                self.canvas_main_img.bindings()
 
 
     def prepare_GUI_with_proj(self):
         self.project_open = True
-        self.root.title(os.path.basename(self.file_project_save)[0:-4] + " - ColCal")
+        self.root.title(os.path.basename(self.file_project_save)[0:-4] + " - AnimalCol")
         self.projectmenu.entryconfig(2, state="active")
         self.projectmenu.entryconfig(3, state="active")
         self.projectmenu.entryconfig(4, state="active")
@@ -1295,7 +1336,7 @@ class Interface(Frame):
 
     def prepare_GUI_without_proj(self):
         self.project_open = False
-        self.root.title(os.path.basename(self.file_project_save)[0:-4] + " - ColCal")
+        self.root.title(os.path.basename(self.file_project_save)[0:-4] + " - AnimalCol")
         self.projectmenu.entryconfig(2, state="disabled")
         self.projectmenu.entryconfig(3, state="disabled")
         self.projectmenu.entryconfig(4, state="disabled")
@@ -1375,16 +1416,12 @@ class Interface(Frame):
         self.modif_image()
         self.canvas_main_img.bindings()
 
-
-
     def load_images(self,load_frame):
-        print("Load images")
         self.Images = []
         first = True
         compteur = -1
         count=0
         self.do_not_open = False
-        print(self.Images_names)
         directory=None
         if len(self.Images_names)>0:
             to_remove=[]
@@ -1484,10 +1521,15 @@ class Interface(Frame):
         return (split_range, [low_h, high_h], mean_h)
 
     def save_particles(self):
-        Extracting_particles.save_particles(self.frame_main, self.Datas_generales, self.distance, self.Images)
+        try:
+            self.root.protocol("WM_DELETE_WINDOW", self.quit_danger)
+            Extracting_particles.save_particles(self.frame_main, self.Datas_generales, self.distance, self.Images)
+            self.root.protocol("WM_DELETE_WINDOW", self.quit)
+        except:
+            self.root.protocol("WM_DELETE_WINDOW", self.quit)
 
 window = Tk()
-window.title("No project - ColCal")
+window.title("No project - AnimalCol")
 window.iconbitmap(User_loading.resource_path(os.path.join("Logo_AnimalCol.ico")))
 interface = Interface(window)
 interface.mainloop()
