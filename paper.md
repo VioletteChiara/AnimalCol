@@ -84,30 +84,30 @@ area and ratio of red colored surface over the whole-body area.
 
 Step 1. Project preparation
 
-* Launch `AnimalCol` and create a new project (Project > New)
-* Add the images to be used (Images > Add new images)
+- Launch `AnimalCol` and create a new project (Project > New)
+- Add the images to be used (Images > Add new images)
 
 Step 2. Definition of the ROIs (\autoref{fig:Figure1}C)
 
-* Click the Detection > Automatic target detection menu. 
-* Click on the background several times until the fish area is highlighted in pink. Tools of erosion, dilation and 
-* surface filters can also be used to improve results.
-* Click the “Select all” button in the “Videos” section and validate.
-* If necessary, manual correction of the ROIs can be done by clicking on the images.
+- Click the Detection > Automatic target detection menu. 
+- Click on the background several times until the fish area is highlighted in pink. Tools of erosion, dilation and 
+- surface filters can also be used to improve results.
+- Click the “Select all” button in the “Videos” section and validate.
+- If necessary, manual correction of the ROIs can be done by clicking on the images.
 
 Step 3. Definition of the Scale (\autoref{fig:Figure1}A)
 
-* Move the two points on the top left corner of the images to set a known distance, for example using a reference 
+- Move the two points on the top left corner of the images to set a known distance, for example using a reference 
 scale on the image. 
-* Fill in the “Real life distance" entry on the top right corner of the program with the known distance between 
+- Fill in the “Real life distance" entry on the top right corner of the program with the known distance between 
 the two points.
 
 Step 4. Particles detection and extraction
 
-* Use the color chart to select the color of interest (in the example, hue 340–60, saturation 100–255, and value
+- Use the color chart to select the color of interest (in the example, hue 340–60, saturation 100–255, and value
 25–255, \autoref{fig:Figure1}E).
-* Click the “Validate all” button. 
-* In the main menu, select Detection>Export particles and select a destination location. The results will be saved as
+- Click the “Validate all” button. 
+- In the main menu, select Detection>Export particles and select a destination location. The results will be saved as
 .csv file.
 
 The ranking of the fish according to the red ratio can be seen on \autoref{fig:Figure1}. 
