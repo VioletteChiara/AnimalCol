@@ -444,6 +444,8 @@ class Interface(Frame):
                 if answer:
                     self.save()
                 self.root.destroy()
+        else:
+            self.root.destroy()
 
     def quit_danger(self):
         tkinter.messagebox.showerror("Please wait", "Saving in progress. You cannot close the program right now.")
