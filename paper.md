@@ -17,7 +17,6 @@ authors:
 affiliations:
  - name: Museum and Institute of Zoology, Polish Academy of Science, Warsaw, Poland
    index: 1
-   ror: 00hx57361
  - name: Grupo Ecoloxía Animal, Torre CACTI, Centro de Investigación Mariña, Universidade de Vigo, Vigo, Spain
    index: 2
 
