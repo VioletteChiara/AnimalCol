@@ -9,11 +9,9 @@ tags:
 authors:
   - name: Violette Chiara
     orcid: 0000-0002-3442-5336
-    equal-contrib: true
     affiliation: "1, 2" # (Multiple affiliations must be quoted)
   - name: Sin-Yeon Kim
     orcid: 0000-0002-5170-8477
-    equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
     affiliation: 2
 
 affiliations:
@@ -131,6 +129,7 @@ blue phenotype, while females have green or blue phenotype.\label{fig:Figure2}](
 # Acknowledgements
 
 We gratefully acknowledge Dr. Iago Sanmartín-Villar for kindly providing the images used to illustrate
-the program features.
+the program features. SYK was supported by the Ministerio de Ciencia e Innovación 
+(MCIN/AEI/10.13039/501100011033, project PID2022-138503NB-I00).
 
 # References
