@@ -9,6 +9,7 @@ AnimalCol is a Python-based software designed for the Windows operating system, 
 
 # How to cite
 If you are using AnimalCol for your research, please cite: 
+
 Chiara, V., & Kim, S.-Y. (2026). AnimalCol: A tool for quantitative color analysis of digital images. Zenodo. https://doi.org/10.5281/zenodo.20107897
 
 # Automated tests
